@@ -1,0 +1,26 @@
+Checks: >
+    -*,
+    bugprone-*,
+    -bugprone-easily-swappable-parameters,
+    clang-analyzer-*,
+    misc-*,
+    performance-*,
+    readability-*,
+    -readability-braces-around-statements,
+    -readability-else-after-return,
+    -readability-function-cognitive-complexity,
+    -readability-function-size,
+    -readability-identifier-length,
+    -readability-math-missing-parentheses,
+    -readability-magic-numbers,
+    -readability-named-parameter,
+    -readability-qualified-auto,
+    -readability-redundant-access-specifiers,
+    -readability-redundant-member-init,
+    -readability-static-accessed-through-instance,
+    -readability-uppercase-literal-suffix,
+    -readability-use-anyofallof,
+    -readability-use-std-min-max,
+WarningsAsErrors: '*'
+FormatStyle: 'file'
+
