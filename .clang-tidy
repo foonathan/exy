@@ -4,6 +4,7 @@ Checks: >
     -bugprone-easily-swappable-parameters,
     clang-analyzer-*,
     misc-*,
+    -misc-non-private-member-variables-in-classes,
     performance-*,
     readability-*,
     -readability-braces-around-statements,

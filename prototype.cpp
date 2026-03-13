@@ -3,8 +3,16 @@
 
 #include <cstdio>
 
+#include <exy/future/just.hpp>
+#include <exy/future/transform.hpp>
+#include <exy/sync_wait.hpp>
+
+namespace exyf = exy::futures;
+
 int main()
 {
-    puts("Hello, World!");
+    auto pipeline = exyf::transform(exyf::just(11), [](int i) { return i * 2; });
+    auto result   = exy::sync_wait(exy_mov(pipeline));
+    std::printf("%d\n", result);
 }
 
