@@ -68,9 +68,9 @@ struct _t : exy::future_base
     };
 };
 
-inline constexpr struct
+inline constexpr struct transform_t
 {
-    template <exy::future F, exy::invocable_with_signature_values<F::signature()> Fn>
+    template <exy::future F, auto S = F::signature(), exy::invocable_with_signature_values<S> Fn>
     static constexpr auto operator()(F&& f, Fn&& fn) EXY_RETURN(
         _t<F, std::decay_t<Fn>>{{}, exy_mov(f), exy_fwd(fn)}
     )

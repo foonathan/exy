@@ -39,7 +39,7 @@ struct _j : exy::future_base, exy::state_base
     };
 };
 
-inline constexpr struct
+inline constexpr struct just_t
 {
     template <exy::movable T>
     static constexpr auto operator()(T&& value) EXY_RETURN(
