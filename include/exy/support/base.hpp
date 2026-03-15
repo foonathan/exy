@@ -22,12 +22,6 @@
 #define exy_fwd(...)        static_cast<decltype(__VA_ARGS__)>(__VA_ARGS__)
 #define exy_invoke(fn, ...) (fn)(__VA_ARGS__)
 
-#define EXY_RETURN(...)                                                                            \
-    noexcept(noexcept(__VA_ARGS__))->decltype(__VA_ARGS__)                                         \
-    {                                                                                              \
-        return __VA_ARGS__;                                                                        \
-    }
-
 #define EXY_NO_UNIQUE_ADDRESS [[no_unique_address]]
 #define EXY_TAIL_CALL         [[clang::musttail]] return
 

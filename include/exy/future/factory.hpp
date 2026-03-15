@@ -63,7 +63,10 @@ struct _v : exy::future_base
 inline constexpr struct value_t
 {
     template <exy::movable T>
-    static constexpr auto operator()(T&& value) EXY_RETURN(_v<std::decay_t<T>>{{}, exy_fwd(value)})
+    static constexpr _v<std::decay_t<T>> operator()(T&& value)
+    {
+        return {{}, exy_fwd(value)};
+    }
 } value;
 } // namespace exy::futures
 

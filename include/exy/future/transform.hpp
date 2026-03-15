@@ -79,9 +79,10 @@ inline constexpr struct transform_t
     template <
         exy::future                             F, typename S = exy::signatures_of<F>,
         exy::invocable_with_signature_values<S> Fn>
-    static constexpr auto operator()(F&& f, Fn&& fn) EXY_RETURN(
-        _t<F, std::decay_t<Fn>>{{}, exy_mov(f), exy_fwd(fn)}
-    )
+    static constexpr auto operator()(F&& f, Fn&& fn) -> _t<F, std::decay_t<Fn>>
+    {
+        return {{}, exy_mov(f), exy_fwd(fn)};
+    }
 } transform;
 } // namespace exy::futures
 
