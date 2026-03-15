@@ -4,6 +4,8 @@
 cmake_minimum_required(VERSION 4.0)
 project(exy LANGUAGES CXX)
 
+find_package(Boost REQUIRED)
+
 function(add_alias target)
     add_library(foonathan::${target} ALIAS ${target})
     set_target_properties(${target} PROPERTIES EXPORT_NAME ${target})
@@ -17,7 +19,7 @@ target_include_directories(_exy_base SYSTEM INTERFACE include)
 # Core library.
 add_library(exy INTERFACE)
 add_alias(exy)
-target_link_libraries(exy INTERFACE _exy_base)
+target_link_libraries(exy INTERFACE _exy_base boost::mp11)
 target_include_directories(exy SYSTEM INTERFACE include)
 
 # Core library with warnings; for development only.

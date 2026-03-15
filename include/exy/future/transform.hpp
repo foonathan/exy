@@ -8,11 +8,9 @@
 
 namespace exy
 {
-template <typename Fn, auto Signature>
+template <typename Fn, typename S>
 concept invocable_with_signature_values
-    = []<typename... T>(exy::signature_t<exy::signature_value_t(T)...>) {
-          return (exy::invocable<Fn&&, T> && ...);
-      }(Signature);
+    = exy::signatures_all_of_tag<S, exy::value_tag, _::mp_bind_front<exy::is_invocable, Fn>>;
 } // namespace exy
 
 namespace exy::futures
@@ -23,12 +21,12 @@ struct _t : exy::future_base
     EXY_NO_UNIQUE_ADDRESS Base _base;
     EXY_NO_UNIQUE_ADDRESS Fn   _fn;
 
-    static consteval auto signature() noexcept
-    {
-        return []<typename... T>(exy::signature_t<exy::signature_value_t(T)...>) {
-            return exy::signature_t<exy::signature_value_t(exy::invoke_result_t<Fn&&, T>)...>{};
-        }(Base::signature());
-    }
+    using signatures = exy::signatures_insert_exception<
+        exy::signatures_transform_tag<
+            exy::signatures_of<Base>, exy::value_tag, _::mp_bind_front<exy::invoke_result_t, Fn>>,
+        exy::signatures_all_of_tag<
+            exy::signatures_of<Base>, exy::value_tag,
+            _::mp_bind_front<exy::is_nothrow_invocable, Fn>>>;
 
     struct state : exy::state_base
     {
@@ -40,7 +38,7 @@ struct _t : exy::future_base
 
     static consteval auto storage_spec() noexcept
     {
-        return exy::storage_spec::get(Base::signature(), signature());
+        return exy::storage_spec::get(exy::signatures_of<Base>{}, signatures());
     }
 
     template <typename Cont, auto... Path>
@@ -48,14 +46,24 @@ struct _t : exy::future_base
     {
         struct _c
         {
-            template <typename T>
-            static constexpr void* resume(exy::state_ref s, exy::storage_ref result)
+            template <typename S>
+            static constexpr void* call(exy::state_ref s, exy::storage_ref result)
             {
                 state& self = s.get<Path...>();
 
-                using transformed_t = exy::invoke_result_t<Fn&&, T&&>;
-                result.emplace<transformed_t>(exy_invoke(exy_mov(self._fn), result.get<T>()));
-                EXY_TAIL_CALL Cont::template resume<transformed_t>(s, result);
+                if constexpr (std::same_as<exy::signature_tag<S>, exy::value_tag>)
+                {
+                    using value_type       = exy::signature_argument<S>;
+                    using transformed_type = exy::invoke_result_t<Fn&&, value_type>;
+                    result.emplace<transformed_type>(
+                        exy_invoke(exy_mov(self._fn), result.get<value_type>())
+                    );
+                    EXY_TAIL_CALL Cont::template call<exy::value_tag(transformed_type)>(s, result);
+                }
+                else
+                {
+                    EXY_TAIL_CALL Cont::template call<S>(s, result);
+                }
             }
         };
 
@@ -68,7 +76,9 @@ struct _t : exy::future_base
 
 inline constexpr struct transform_t
 {
-    template <exy::future F, auto S = F::signature(), exy::invocable_with_signature_values<S> Fn>
+    template <
+        exy::future                             F, typename S = exy::signatures_of<F>,
+        exy::invocable_with_signature_values<S> Fn>
     static constexpr auto operator()(F&& f, Fn&& fn) EXY_RETURN(
         _t<F, std::decay_t<Fn>>{{}, exy_mov(f), exy_fwd(fn)}
     )

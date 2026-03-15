@@ -13,10 +13,8 @@ struct _v : exy::future_base
 {
     EXY_NO_UNIQUE_ADDRESS T _value;
 
-    static consteval auto signature() noexcept
-    {
-        return exy::signature_t<exy::signature_value_t(T)>{};
-    }
+    using signatures = exy::signatures_insert_exception<
+        exy::signatures<exy::value_tag(T)>, std::is_nothrow_move_constructible_v<T>>;
 
     struct state : exy::state_base
     {
@@ -27,7 +25,7 @@ struct _v : exy::future_base
 
     static consteval auto storage_spec() noexcept
     {
-        return exy::storage_spec::get(signature());
+        return exy::storage_spec::get(signatures());
     }
 
     template <typename Cont, auto... Path>
@@ -37,8 +35,27 @@ struct _v : exy::future_base
         {
             state& self = s.get<Path...>();
 
-            result.emplace<T>(exy_mov(self._value));
-            EXY_TAIL_CALL Cont::template resume<T>(s, result);
+            auto cont = [&] noexcept {
+                if constexpr (std::is_nothrow_move_constructible_v<T>)
+                {
+                    result.emplace<T>(exy_mov(self._value));
+                    return &Cont::template call<exy::value_tag(T)>;
+                }
+                else
+                {
+                    try
+                    {
+                        result.emplace<T>(exy_mov(self._value));
+                        return &Cont::template call<exy::value_tag(T)>;
+                    }
+                    catch (...)
+                    {
+                        result.emplace<std::exception_ptr>(std::current_exception());
+                        return &Cont::template call<exy::error_tag(std::exception_ptr)>;
+                    }
+                }
+            }();
+            EXY_TAIL_CALL cont(s, result);
         }
     };
 };

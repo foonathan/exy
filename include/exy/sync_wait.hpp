@@ -11,6 +11,11 @@ namespace exy
 inline constexpr struct
 {
     template <typename F>
+    using _value_type = exy::signatures_fold_tag<
+        exy::signatures_of<F>, exy::value_tag, _::mp_quote<std::common_type_t>,
+        _::mp_quote<exy::signature_argument>>;
+
+    template <typename F>
     struct _state : exy::state_base
     {
         typename F::state _s;
@@ -18,12 +23,20 @@ inline constexpr struct
         constexpr explicit _state(F&& f) : _s(exy_mov(f)) {}
     };
 
+    template <typename T>
     struct _c
     {
-        template <typename T>
-        static constexpr void* resume(exy::state_ref, exy::storage_ref) noexcept
+        template <exy::signature_with_tag<exy::value_tag> S>
+        static constexpr void* call(exy::state_ref, exy::storage_ref result)
         {
+            result.emplace<T>(result.template get<exy::signature_argument<S>>());
             return nullptr;
+        }
+
+        template <exy::signature_with_tag<exy::error_tag> S>
+        static constexpr void* call(exy::state_ref, exy::storage_ref result)
+        {
+            throw result.template get<exy::signature_argument<S>>();
         }
     };
 
@@ -32,9 +45,8 @@ inline constexpr struct
     {
         _state<F>                       state(exy_mov(f));
         exy::storage<F::storage_spec()> result;
-        F::template op<_c, &_state<F>::_s>::start(state, result);
-
-        return exy::storage_ref(result).get<exy::signature_common_value_type<F::signature()>>();
+        F::template op<_c<_value_type<F>>, &_state<F>::_s>::start(state, result);
+        return exy::storage_ref(result).get<_value_type<F>>();
     }
 } sync_wait;
 } // namespace exy

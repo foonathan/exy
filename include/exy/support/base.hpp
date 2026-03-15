@@ -14,6 +14,7 @@
 
 #include <cassert>
 #include <compare>
+#include <boost/mp11.hpp>
 
 #define exy_assert(...) assert(__VA_ARGS__)
 
@@ -49,12 +50,27 @@ template <typename Fn, typename... Args>
 concept invocable
     = requires (Fn&& fn, Args&&... args) { exy_invoke(exy_fwd(fn), exy_fwd(args)...); };
 template <typename Fn, typename... Args>
+using is_invocable = std::bool_constant<invocable<Fn, Args...>>;
+
+template <typename Fn, typename... Args>
+concept nothrow_invocable = invocable<Fn, Args...> && requires (Fn&& fn, Args&&... args) {
+    { exy_invoke(exy_fwd(fn), exy_fwd(args)...) } noexcept;
+};
+template <typename Fn, typename... Args>
+using is_nothrow_invocable = std::bool_constant<nothrow_invocable<Fn, Args...>>;
+
+template <typename Fn, typename... Args>
 using invoke_result_t = decltype(exy_invoke(std::declval<Fn>(), std::declval<Args>()...));
 } // namespace exy
 
 //=== utility ===//
 namespace exy
 {
+namespace _
+{
+    using namespace boost::mp11;
+}
+
 template <auto C>
 using constant = std::integral_constant<decltype(C), C>;
 
@@ -69,18 +85,63 @@ constexpr auto max(const auto& h, const auto&... t) noexcept
 //=== signature ===//
 namespace exy
 {
+template <typename T>
+struct _signature_trait;
+template <typename Tag, typename T>
+struct _signature_trait<Tag(T)>
+{
+    using tag      = Tag;
+    using argument = T;
+};
+
+template <typename T>
+using signature_tag = typename _signature_trait<T>::tag;
+template <typename T>
+using signature_argument = typename _signature_trait<T>::argument;
+
+template <typename Signature, typename Tag>
+concept signature_with_tag = std::same_as<signature_tag<Signature>, Tag>;
+
+struct value_tag
+{
+    template <typename... Args>
+    using make = value_tag(Args...);
+
+    template <typename T>
+    using is = std::bool_constant<signature_with_tag<T, value_tag>>;
+};
+struct error_tag
+{
+    template <typename... Args>
+    using make = value_tag(Args...);
+
+    template <typename T>
+    using is = std::bool_constant<signature_with_tag<T, error_tag>>;
+};
+
 template <typename... T>
-struct signature_t
+struct signatures
 {};
 
-struct signature_value_t
-{};
+template <typename S, typename Tag, typename QSum, typename QProduct>
+using signatures_fold_tag
+    = _::mp_apply_q<QSum, _::mp_transform_q<QProduct, _::mp_filter<Tag::template is, S>>>;
 
-template <auto Signature>
-using signature_common_value_type
-    = decltype([]<typename... T>(signature_t<signature_value_t(T)...>) {
-          return std::common_type<T...>{};
-      }(Signature))::type;
+template <typename S, typename Tag, typename QFn>
+using signatures_transform_tag = _::mp_transform_if_q<
+    _::mp_quote<Tag::template is>,
+    _::mp_compose<exy::signature_argument, QFn::template fn, Tag::template make>, S>;
+
+template <typename S, typename Tag, typename QPredicate>
+constexpr bool signatures_all_of_tag = _::mp_all_of<
+    signatures_fold_tag<
+        S, Tag, _::mp_quote<_::mp_list>,
+        _::mp_compose_q<_::mp_quote<exy::signature_argument>, QPredicate>>,
+    _::mp_identity_t>::value;
+
+template <typename S, bool Noexcept>
+using signatures_insert_exception
+    = std::conditional_t<Noexcept, S, _::mp_push_back<S, exy::error_tag(std::exception_ptr)>>;
 } // namespace exy
 
 //=== state ===//
@@ -123,22 +184,22 @@ struct storage_spec
     std::size_t alignment;
 
     template <exy::object T>
-    static consteval storage_spec get(std::type_identity<T> = {}) noexcept
+    static consteval storage_spec get(std::type_identity<T>) noexcept
     {
         return {sizeof(T), alignof(T)};
     }
     template <exy::reference T>
-    static consteval storage_spec get(std::type_identity<T> = {}) noexcept
+    static consteval storage_spec get(std::type_identity<T>) noexcept
     {
         return {sizeof(void*), alignof(void*)};
     }
     template <std::same_as<void> T>
-    static consteval storage_spec get(std::type_identity<T> = {}) noexcept
+    static consteval storage_spec get(std::type_identity<T>) noexcept
     {
         return {0, 1};
     }
-    template <typename... T>
-    static consteval storage_spec get(exy::signature_t<exy::signature_value_t(T)...>) noexcept
+    template <typename... Tag, typename... T>
+    static consteval storage_spec get(exy::signatures<Tag(T)...>) noexcept
     {
         return get(std::type_identity<T>{}...);
     }
@@ -219,6 +280,9 @@ struct future_base
 
 template <typename T>
 concept future = std::derived_from<T, future_base>;
+
+template <typename F>
+using signatures_of = typename F::signatures;
 } // namespace exy
 
 #endif // EXY_SUPPORT_BASE_HPP_INCLUDED
