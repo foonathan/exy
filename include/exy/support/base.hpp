@@ -6,7 +6,6 @@
 
 // IWYU pragma: begin_exports
 #include <concepts>
-#include <coroutine>
 #include <cstddef>
 #include <cstdint>
 #include <exception>

@@ -49,8 +49,7 @@ struct _t : exy::future_base
         struct _c
         {
             template <typename T>
-            static constexpr auto resume(exy::state_ref s, exy::storage_ref result)
-                -> std::coroutine_handle<>
+            static constexpr void* resume(exy::state_ref s, exy::storage_ref result)
             {
                 state& self = s.get<Path...>();
 
@@ -60,8 +59,7 @@ struct _t : exy::future_base
             }
         };
 
-        static constexpr auto start(exy::state_ref s, exy::storage_ref result)
-            -> std::coroutine_handle<>
+        static constexpr void* start(exy::state_ref s, exy::storage_ref result)
         {
             EXY_TAIL_CALL Base::template op<_c, Path..., &state::_base>::start(s, result);
         }

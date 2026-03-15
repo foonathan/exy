@@ -21,10 +21,9 @@ inline constexpr struct
     struct _c
     {
         template <typename T>
-        static constexpr auto resume(exy::state_ref, exy::storage_ref) noexcept
-            -> std::coroutine_handle<>
+        static constexpr void* resume(exy::state_ref, exy::storage_ref) noexcept
         {
-            return {};
+            return nullptr;
         }
     };
 

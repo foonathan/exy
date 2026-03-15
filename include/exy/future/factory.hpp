@@ -33,8 +33,7 @@ struct _v : exy::future_base
     template <typename Cont, auto... Path>
     struct op
     {
-        static constexpr auto start(exy::state_ref s, exy::storage_ref result)
-            -> std::coroutine_handle<>
+        static constexpr void* start(exy::state_ref s, exy::storage_ref result)
         {
             state& self = s.get<Path...>();
 
