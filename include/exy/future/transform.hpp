@@ -43,9 +43,7 @@ struct _t : exy::future_base
 
     static consteval auto storage_spec() noexcept
     {
-        return exy::max(
-            exy::storage_spec::get(exy::signatures_of<Base>{}), exy::storage_spec::get(signatures())
-        );
+        return exy::max(Base::storage_spec(), exy::storage_spec::get(signatures()));
     }
 
     template <typename Cont, auto... Path>
