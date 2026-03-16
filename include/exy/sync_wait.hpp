@@ -4,13 +4,15 @@
 #ifndef EXY_SYNC_WAIT_HPP_INCLUDED
 #define EXY_SYNC_WAIT_HPP_INCLUDED
 
+#include <optional>
 #include <exy/support/future.hpp>
 
 namespace exy
 {
 template <typename S>
 concept single_value_signatures
-    = exy::signatures_all_of_tag<S, exy::value_tag, _::mp_compose<_::mp_list, _::mp_is_unit_list>>;
+    = exy::signatures_any_of_tag<S, exy::value_tag>
+   && exy::signatures_all_of_tag<S, exy::value_tag, _::mp_compose<_::mp_list, _::mp_is_unit_list>>;
 
 template <typename S>
 concept exception_error_signatures = exy::signatures_all_of_tag<
@@ -21,9 +23,9 @@ concept exception_error_signatures = exy::signatures_all_of_tag<
 inline constexpr struct
 {
     template <typename F>
-    using _value_type = exy::signatures_fold_tag<
+    using _value_type = std::optional<exy::signatures_fold_tag<
         exy::signatures_of<F>, exy::value_tag, _::mp_quote<std::common_type_t>,
-        _::mp_compose<_::mp_list, _::mp_only>>;
+        _::mp_compose<_::mp_list, _::mp_only>>>;
 
     template <typename F>
     struct _state : exy::state_base
@@ -49,6 +51,13 @@ inline constexpr struct
         static constexpr void* call(exy::state_ref, exy::storage_ref result)
         {
             result.get<S>([&](const std::exception_ptr& e) { std::rethrow_exception(e); });
+        }
+
+        template <exy::signature_with_tag<exy::stopped_tag> S>
+        static constexpr void* call(exy::state_ref, exy::storage_ref result) noexcept
+        {
+            result.emplace<exy::value_tag(T)>(std::nullopt);
+            return nullptr;
         }
     };
 

@@ -47,6 +47,14 @@ struct error_tag
     template <typename T>
     using is = std::bool_constant<signature_with_tag<T, error_tag>>;
 };
+struct stopped_tag
+{
+    template <typename... T>
+    using make = stopped_tag(T...);
+
+    template <typename T>
+    using is = std::bool_constant<signature_with_tag<T, stopped_tag>>;
+};
 } // namespace exy
 
 namespace exy
@@ -71,6 +79,14 @@ using signatures_transform_tag = _::mp_unique<_::mp_transform_if_q<
 
 template <typename S, typename Tag, typename QPredicate>
 constexpr bool signatures_all_of_tag = _::mp_all_of<
+    signatures_fold_tag<S, Tag, _::mp_quote<_::mp_list>, QPredicate>, _::mp_identity_t>::value;
+
+template <typename S, typename Tag, typename QPredicate = _::mp_constant_fn<std::true_type>>
+constexpr bool signatures_any_of_tag = _::mp_any_of<
+    signatures_fold_tag<S, Tag, _::mp_quote<_::mp_list>, QPredicate>, _::mp_identity_t>::value;
+
+template <typename S, typename Tag, typename QPredicate = _::mp_constant_fn<std::true_type>>
+constexpr bool signatures_none_of_tag = _::mp_none_of<
     signatures_fold_tag<S, Tag, _::mp_quote<_::mp_list>, QPredicate>, _::mp_identity_t>::value;
 
 template <typename S, bool Noexcept>

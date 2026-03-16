@@ -43,6 +43,13 @@ namespace _
 {
     using namespace boost::mp11;
 
+    template <typename T>
+    struct mp_constant_fn
+    {
+        template <typename...>
+        using fn = T;
+    };
+
     template <typename L>
     using mp_is_unit_list = std::bool_constant<mp_size<L>::value == 1>;
 

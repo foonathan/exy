@@ -54,14 +54,16 @@ template <typename Tag>
 struct factory_t
 {
     template <exy::movable... Ts>
+        requires (!std::same_as<Tag, exy::stopped_tag> || sizeof...(Ts) == 0)
     static constexpr _f<Tag, std::decay_t<Ts>...> operator()(Ts&&... args)
     {
         return {{}, exy::make_pack(exy_fwd(args)...)};
     }
 };
 
-inline constexpr factory_t<exy::value_tag> value;
-inline constexpr factory_t<exy::error_tag> error;
+inline constexpr factory_t<exy::value_tag>   value;
+inline constexpr factory_t<exy::error_tag>   error;
+inline constexpr factory_t<exy::stopped_tag> stopped;
 } // namespace exy::futures
 
 #endif // EXY_FUTURE_FACTORY_HPP_INCLUDED

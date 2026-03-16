@@ -100,10 +100,12 @@ struct transform_t
     }
 };
 
-inline constexpr transform_t<exy::value_tag, exy::value_tag> transform;
-inline constexpr transform_t<exy::error_tag, exy::error_tag> transform_error;
+inline constexpr transform_t<exy::value_tag, exy::value_tag>     transform;
+inline constexpr transform_t<exy::error_tag, exy::error_tag>     transform_error;
+inline constexpr transform_t<exy::stopped_tag, exy::stopped_tag> transform_stopped;
 
-inline constexpr transform_t<exy::error_tag, exy::value_tag> upon_error;
+inline constexpr transform_t<exy::error_tag, exy::value_tag>   upon_error;
+inline constexpr transform_t<exy::stopped_tag, exy::value_tag> upon_stopped;
 } // namespace exy::futures
 
 #endif // EXY_FUTURE_TRANSFORM_HPP_INCLUDED
