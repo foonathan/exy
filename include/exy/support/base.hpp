@@ -71,7 +71,7 @@ using constant = std::integral_constant<decltype(C), C>;
 constexpr auto max(const auto& h, const auto&... t) noexcept
 {
     auto result = h;
-    (void)(((t >= h) ? result = h, 0 : 0), ...);
+    (void)(((t >= h) ? result = t, 0 : 0), ...);
     return result;
 }
 } // namespace exy
