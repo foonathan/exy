@@ -5,7 +5,6 @@
 #define EXY_FUTURE_TRANSFORM_HPP_INCLUDED
 
 #include <exy/support/adapter.hpp>
-#include <exy/support/base.hpp>
 #include <exy/support/invoke.hpp>
 
 namespace exy

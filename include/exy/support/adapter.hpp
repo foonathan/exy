@@ -4,7 +4,7 @@
 #ifndef EXY_SUPPORT_ADAPTER_HPP_INCLUDED
 #define EXY_SUPPORT_ADAPTER_HPP_INCLUDED
 
-#include <exy/support/base.hpp>
+#include <exy/support/future.hpp> // IWYU pragma: export
 
 namespace exy
 {

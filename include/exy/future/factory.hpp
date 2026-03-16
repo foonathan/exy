@@ -4,7 +4,7 @@
 #ifndef EXY_FUTURE_FACTORY_HPP_INCLUDED
 #define EXY_FUTURE_FACTORY_HPP_INCLUDED
 
-#include <exy/support/base.hpp>
+#include <exy/support/future.hpp>
 
 namespace exy::futures
 {
