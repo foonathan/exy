@@ -20,7 +20,11 @@ struct _f : exy::future_base
     {
         EXY_NO_UNIQUE_ADDRESS exy::pack<Ts...> _pack;
 
-        constexpr explicit state(_f&& self) : _pack(exy_mov(self)._pack) {}
+        constexpr explicit state(_f&& self) noexcept(
+            (std::is_nothrow_move_constructible_v<Ts> && ...)
+        )
+        : _pack(exy_mov(self)._pack)
+        {}
     };
 
     static consteval auto storage_spec() noexcept

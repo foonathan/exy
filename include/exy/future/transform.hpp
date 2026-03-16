@@ -33,17 +33,22 @@ struct _t : exy::future_base
         // The function must be nothrow.
         exy::signatures_all_of_tag<
             exy::signatures_of<Base>, TagFrom, _::mp_bind_front<exy::is_nothrow_invocable, Fn>>
-            // And we must be able to nothrow move construct it into the storage.
+            // And we must be able to nothrow move construct the result into the storage.
             && exy::signatures_all_of_tag<
                 _transformed_values, TagTo,
                 _::mp_compose<exy::pack, std::is_nothrow_move_constructible>>>;
 
     struct state : exy::state_base
     {
-        EXY_NO_UNIQUE_ADDRESS typename Base::state _base;
-        EXY_NO_UNIQUE_ADDRESS Fn                   _fn;
+        EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _base;
+        EXY_NO_UNIQUE_ADDRESS Fn                  _fn;
 
-        constexpr explicit state(_t&& self) : _base(exy_mov(self)._base), _fn(exy_mov(self)._fn) {}
+        constexpr explicit state(_t&& self) noexcept(
+            std::is_nothrow_constructible_v<exy::state_of<Base>, Base&&>
+            && std::is_nothrow_move_constructible_v<Fn>
+        )
+        : _base(exy_mov(self)._base), _fn(exy_mov(self)._fn)
+        {}
     };
 
     static consteval auto storage_spec() noexcept

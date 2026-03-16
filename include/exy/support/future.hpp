@@ -47,8 +47,7 @@ constexpr auto set_exception(exy::storage_ref result) noexcept -> continuation
     }
     else
     {
-        exy_assert(false);
-        return nullptr;
+        std::terminate();
     }
 }
 } // namespace exy

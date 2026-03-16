@@ -44,14 +44,19 @@ struct _at : exy::future_base
 
     struct state : exy::state_base
     {
-        EXY_NO_UNIQUE_ADDRESS typename Base::state _base;
-        EXY_NO_UNIQUE_ADDRESS Fn                   _fn;
+        EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _base;
+        EXY_NO_UNIQUE_ADDRESS Fn                  _fn;
         _::mp_apply<
             std::variant,
             _::mp_set_push_front<_::mp_transform<exy::state_of, _fn_result_types>, std::monostate>>
             _inner;
 
-        constexpr explicit state(_at&& self) : _base(exy_mov(self)._base), _fn(exy_mov(self)._fn) {}
+        constexpr explicit state(_at&& self) noexcept(
+            std::is_nothrow_constructible_v<exy::state_of<Base>, Base&&>
+            && std::is_nothrow_move_constructible_v<Fn>
+        )
+        : _base(exy_mov(self)._base), _fn(exy_mov(self)._fn)
+        {}
     };
 
     static consteval auto storage_spec() noexcept
