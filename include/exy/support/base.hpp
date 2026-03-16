@@ -277,6 +277,52 @@ concept future = std::derived_from<T, future_base>;
 
 template <typename F>
 using signatures_of = typename F::signatures;
+
+using continuation = void* (*)(exy::state_ref, exy::storage_ref);
+
+template <typename Cont, typename T>
+constexpr auto set_value(
+    exy::storage_ref result, auto&&... args
+) noexcept(std::is_nothrow_constructible_v<T, decltype(args)...>) -> continuation
+{
+    result.emplace<T>(exy_fwd(args)...);
+    return &Cont::template call<exy::value_tag(T)>;
+}
+
+template <typename Cont, typename T>
+constexpr auto set_error(
+    exy::storage_ref result, auto&&... args
+) noexcept(std::is_nothrow_constructible_v<T, decltype(args)...>) -> continuation
+{
+    result.emplace<T>(exy_fwd(args)...);
+    return &Cont::template call<exy::error_tag(T)>;
+}
+
+template <typename Cont>
+constexpr auto set_exception(exy::storage_ref result) noexcept -> continuation
+{
+    return exy::set_error<Cont, std::exception_ptr>(result, std::current_exception());
+}
+
+template <typename Cont, typename T>
+constexpr auto set_value_or_exception(exy::storage_ref result, auto fn) noexcept -> continuation
+{
+    if constexpr (std::is_nothrow_move_constructible_v<T> && noexcept(fn()))
+    {
+        return exy::set_value<Cont, T>(result, fn());
+    }
+    else
+    {
+        try
+        {
+            return exy::set_value<Cont, T>(result, fn());
+        }
+        catch (...)
+        {
+            return exy::set_exception<Cont>(result);
+        }
+    }
+}
 } // namespace exy
 
 #endif // EXY_SUPPORT_BASE_HPP_INCLUDED

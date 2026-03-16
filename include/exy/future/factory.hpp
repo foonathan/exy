@@ -33,29 +33,10 @@ struct _v : exy::future_base
     {
         static constexpr void* start(exy::state_ref s, exy::storage_ref result)
         {
-            state& self = s.get<Path...>();
-
-            auto cont = [&] noexcept {
-                if constexpr (std::is_nothrow_move_constructible_v<T>)
-                {
-                    result.emplace<T>(exy_mov(self._value));
-                    return &Cont::template call<exy::value_tag(T)>;
-                }
-                else
-                {
-                    try
-                    {
-                        result.emplace<T>(exy_mov(self._value));
-                        return &Cont::template call<exy::value_tag(T)>;
-                    }
-                    catch (...)
-                    {
-                        result.emplace<std::exception_ptr>(std::current_exception());
-                        return &Cont::template call<exy::error_tag(std::exception_ptr)>;
-                    }
-                }
-            }();
-            EXY_TAIL_CALL cont(s, result);
+            state&        self = s.get<Path...>();
+            EXY_TAIL_CALL exy::set_value_or_exception<Cont, T>(result, [&] noexcept -> T&& {
+                return exy_mov(self._value);
+            })(s, result);
         }
     };
 };

@@ -21,12 +21,18 @@ struct _t : exy::future_base
     EXY_NO_UNIQUE_ADDRESS Base _base;
     EXY_NO_UNIQUE_ADDRESS Fn   _fn;
 
+    using _transformed_values = exy::signatures_transform_tag<
+        exy::signatures_of<Base>, exy::value_tag, _::mp_bind_front<exy::invoke_result_t, Fn>>;
     using signatures = exy::signatures_insert_exception<
-        exy::signatures_transform_tag<
-            exy::signatures_of<Base>, exy::value_tag, _::mp_bind_front<exy::invoke_result_t, Fn>>,
+        _transformed_values,
+        // The function must be nothrow.
         exy::signatures_all_of_tag<
             exy::signatures_of<Base>, exy::value_tag,
-            _::mp_bind_front<exy::is_nothrow_invocable, Fn>>>;
+            _::mp_bind_front<exy::is_nothrow_invocable, Fn>>
+            // And we must be able to nothrow move construct it into the storage.
+            && exy::signatures_all_of_tag<
+                _transformed_values, exy::value_tag,
+                _::mp_bind_front<std::is_nothrow_move_constructible>>>;
 
     struct state : exy::state_base
     {
@@ -55,10 +61,9 @@ struct _t : exy::future_base
                 {
                     using value_type       = exy::signature_argument<S>;
                     using transformed_type = exy::invoke_result_t<Fn&&, value_type>;
-                    result.emplace<transformed_type>(
-                        exy_invoke(exy_mov(self._fn), result.get<value_type>())
-                    );
-                    EXY_TAIL_CALL Cont::template call<exy::value_tag(transformed_type)>(s, result);
+                    EXY_TAIL_CALL exy::set_value_or_exception<Cont, transformed_type>(result, [&] {
+                        return exy_invoke(exy_mov(self._fn), result.get<value_type>());
+                    })(s, result);
                 }
                 else
                 {
