@@ -20,16 +20,6 @@ struct storage_spec
     {
         return {sizeof(T), alignof(T)};
     }
-    template <exy::reference T>
-    static consteval storage_spec get(std::type_identity<T>) noexcept
-    {
-        return {sizeof(void*), alignof(void*)};
-    }
-    template <std::same_as<void> T>
-    static consteval storage_spec get(std::type_identity<T>) noexcept
-    {
-        return {0, 1};
-    }
     template <typename... Tag, typename... T>
     static consteval storage_spec get(exy::signatures<Tag(T)...>) noexcept
     {
@@ -79,11 +69,6 @@ public:
     {
         ::new(_ptr) T(exy_fwd(args)...);
     }
-    template <exy::reference RefT>
-    constexpr void emplace(std::type_identity_t<RefT> ref) noexcept
-    {
-        ::new(_ptr) auto(&ref);
-    }
 
     template <exy::object T>
     constexpr T get() noexcept
@@ -92,11 +77,6 @@ public:
         auto result = exy_mov(*ptr);
         ptr->~T();
         return result;
-    }
-    template <exy::reference T>
-    constexpr T get() noexcept
-    {
-        return static_cast<T>(*static_cast<std::remove_cvref_t<T>*>(_ptr));
     }
 
 private:

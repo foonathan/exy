@@ -34,9 +34,6 @@ concept movable_object = exy::object<T> && std::movable<T>;
 
 template <typename T>
 concept movable = exy::movable_object<std::remove_cvref_t<T>>;
-
-template <typename T>
-concept reference = std::is_reference_v<T>;
 } // namespace exy
 
 //=== utility ===//
