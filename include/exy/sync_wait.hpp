@@ -58,6 +58,7 @@ inline constexpr struct
         template <exy::signature_with_tag<exy::stopped_tag> S>
         static constexpr void* call(exy::state_ref, exy::storage_ref result) noexcept
         {
+            result.get<S>([](auto&&...) {});
             result.emplace_raw<T>(std::nullopt);
             return nullptr;
         }

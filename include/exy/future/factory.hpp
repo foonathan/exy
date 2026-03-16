@@ -54,7 +54,6 @@ template <typename Tag>
 struct factory_t
 {
     template <exy::movable... Ts>
-        requires (!std::same_as<Tag, exy::stopped_tag> || sizeof...(Ts) == 0)
     static constexpr _f<Tag, std::decay_t<Ts>...> operator()(Ts&&... args)
     {
         return {{}, exy::make_pack(exy_fwd(args)...)};
