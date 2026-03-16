@@ -315,23 +315,6 @@ constexpr auto set_or_exception(exy::storage_ref result, auto fn) noexcept -> co
         }
     }
 }
-
-template <typename Derived, typename Cont>
-struct adapter_continuation
-{
-    template <typename S>
-    static constexpr void* call(exy::state_ref s, exy::storage_ref result)
-        requires requires { Derived::template continuation_for<S>(s, result); }
-    {
-        EXY_TAIL_CALL Derived::template continuation_for<S>(s, result)(s, result);
-    }
-
-    template <typename S>
-    static constexpr void* call(exy::state_ref s, exy::storage_ref result)
-    {
-        EXY_TAIL_CALL Cont::template call<S>(s, result);
-    }
-};
 } // namespace exy
 
 #endif // EXY_SUPPORT_BASE_HPP_INCLUDED

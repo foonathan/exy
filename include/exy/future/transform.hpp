@@ -4,6 +4,7 @@
 #ifndef EXY_FUTURE_TRANSFORM_HPP_INCLUDED
 #define EXY_FUTURE_TRANSFORM_HPP_INCLUDED
 
+#include <exy/support/adapter.hpp>
 #include <exy/support/base.hpp>
 
 namespace exy
@@ -81,6 +82,12 @@ struct transform_t
     static constexpr auto operator()(F&& f, Fn&& fn) -> _t<F, TagFrom, std::decay_t<Fn>, TagTo>
     {
         return {{}, exy_mov(f), exy_fwd(fn)};
+    }
+
+    template <exy::movable Fn>
+    static constexpr auto operator()(Fn&& fn)
+    {
+        return exy::make_adaptor_proxy<transform_t>(exy_fwd(fn));
     }
 };
 
