@@ -68,11 +68,17 @@ constexpr auto max(const auto& h, const auto&... t) noexcept
     return result;
 }
 
-constexpr auto make_pack(exy::movable auto&&... args) noexcept
+constexpr auto _make_pack(exy::movable_object auto&&... args) noexcept
 {
-    return [... elements = exy_fwd(args)](auto&& fn) mutable -> decltype(auto) {
+    // This one only accepts rvalues so we don't create different packes depending on the cv-ref
+    // qualifiers of the values.
+    return [... elements = exy_mov(args)](auto&& fn) mutable -> decltype(auto) {
         return exy_fwd(fn)(exy_mov(elements)...);
     };
+}
+constexpr auto make_pack(exy::movable auto&&... args) noexcept
+{
+    return _make_pack(auto(exy_fwd(args))...);
 }
 
 template <exy::movable_object... Ts>
