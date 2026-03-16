@@ -31,7 +31,8 @@ struct _t : exy::future_base
             exy::signatures_of<Base>, TagFrom, _::mp_bind_front<exy::is_nothrow_invocable, Fn>>
             // And we must be able to nothrow move construct it into the storage.
             && exy::signatures_all_of_tag<
-                _transformed_values, TagTo, _::mp_bind_front<std::is_nothrow_move_constructible>>>;
+                _transformed_values, TagTo,
+                _::mp_compose<exy::pack, std::is_nothrow_move_constructible>>>;
 
     struct state : exy::state_base
     {
