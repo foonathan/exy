@@ -18,9 +18,8 @@
 
 #define exy_assert(...) assert(__VA_ARGS__)
 
-#define exy_mov(...)        static_cast<std::remove_reference_t<decltype(__VA_ARGS__)>&&>(__VA_ARGS__)
-#define exy_fwd(...)        static_cast<decltype(__VA_ARGS__)>(__VA_ARGS__)
-#define exy_invoke(fn, ...) (fn)(__VA_ARGS__)
+#define exy_mov(...) static_cast<std::remove_reference_t<decltype(__VA_ARGS__)>&&>(__VA_ARGS__)
+#define exy_fwd(...) static_cast<decltype(__VA_ARGS__)>(__VA_ARGS__)
 
 #define EXY_NO_UNIQUE_ADDRESS [[no_unique_address]]
 #define EXY_TAIL_CALL         [[clang::musttail]] return
@@ -39,22 +38,6 @@ concept movable = exy::movable_object<std::remove_cvref_t<T>>;
 
 template <typename T>
 concept reference = std::is_reference_v<T>;
-
-template <typename Fn, typename... Args>
-concept invocable
-    = requires (Fn&& fn, Args&&... args) { exy_invoke(exy_fwd(fn), exy_fwd(args)...); };
-template <typename Fn, typename... Args>
-using is_invocable = std::bool_constant<invocable<Fn, Args...>>;
-
-template <typename Fn, typename... Args>
-concept nothrow_invocable = invocable<Fn, Args...> && requires (Fn&& fn, Args&&... args) {
-    { exy_invoke(exy_fwd(fn), exy_fwd(args)...) } noexcept;
-};
-template <typename Fn, typename... Args>
-using is_nothrow_invocable = std::bool_constant<nothrow_invocable<Fn, Args...>>;
-
-template <typename Fn, typename... Args>
-using invoke_result_t = decltype(exy_invoke(std::declval<Fn>(), std::declval<Args>()...));
 } // namespace exy
 
 //=== utility ===//
