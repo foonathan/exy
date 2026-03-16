@@ -78,16 +78,19 @@ using signatures_transform_tag = _::mp_unique<_::mp_transform_if_q<
     S>>;
 
 template <typename S, typename Tag, typename QPredicate>
-constexpr bool signatures_all_of_tag = _::mp_all_of<
-    signatures_fold_tag<S, Tag, _::mp_quote<_::mp_list>, QPredicate>, _::mp_identity_t>::value;
+constexpr bool signatures_all_of_tag = _::mp_all_of_q<
+    _::mp_filter<Tag::template is, S>,
+    _::mp_bind_back<exy::signature_arguments_as, QPredicate>>::value;
 
 template <typename S, typename Tag, typename QPredicate = _::mp_constant_fn<std::true_type>>
-constexpr bool signatures_any_of_tag = _::mp_any_of<
-    signatures_fold_tag<S, Tag, _::mp_quote<_::mp_list>, QPredicate>, _::mp_identity_t>::value;
+constexpr bool signatures_any_of_tag = _::mp_any_of_q<
+    _::mp_filter<Tag::template is, S>,
+    _::mp_bind_back<exy::signature_arguments_as, QPredicate>>::value;
 
 template <typename S, typename Tag, typename QPredicate = _::mp_constant_fn<std::true_type>>
-constexpr bool signatures_none_of_tag = _::mp_none_of<
-    signatures_fold_tag<S, Tag, _::mp_quote<_::mp_list>, QPredicate>, _::mp_identity_t>::value;
+constexpr bool signatures_none_of_tag = _::mp_none_of_q<
+    _::mp_filter<Tag::template is, S>,
+    _::mp_bind_back<exy::signature_arguments_as, QPredicate>>::value;
 
 template <typename S, bool Noexcept>
 using signatures_insert_exception
