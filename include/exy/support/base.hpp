@@ -122,9 +122,9 @@ using signatures_fold_tag
     = _::mp_apply_q<QSum, _::mp_transform_q<QProduct, _::mp_filter<Tag::template is, S>>>;
 
 template <typename S, typename TagFrom, typename QFn, typename TagTo>
-using signatures_transform_tag = _::mp_transform_if_q<
+using signatures_transform_tag = _::mp_unique<_::mp_transform_if_q<
     _::mp_quote<TagFrom::template is>,
-    _::mp_compose<exy::signature_argument, QFn::template fn, TagTo::template make>, S>;
+    _::mp_compose<exy::signature_argument, QFn::template fn, TagTo::template make>, S>>;
 
 template <typename S, typename Tag, typename QPredicate>
 constexpr bool signatures_all_of_tag = _::mp_all_of<
@@ -135,7 +135,7 @@ constexpr bool signatures_all_of_tag = _::mp_all_of<
 
 template <typename S, bool Noexcept>
 using signatures_insert_exception
-    = std::conditional_t<Noexcept, S, _::mp_push_back<S, exy::error_tag(std::exception_ptr)>>;
+    = std::conditional_t<Noexcept, S, _::mp_set_push_back<S, exy::error_tag(std::exception_ptr)>>;
 } // namespace exy
 
 //=== state ===//
