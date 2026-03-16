@@ -5,14 +5,16 @@
 #define EXY_SYNC_WAIT_HPP_INCLUDED
 
 #include <optional>
+#include <tuple>
 #include <exy/support/future.hpp>
 
 namespace exy
 {
 template <typename S>
 concept single_value_signatures
-    = exy::signatures_any_of_tag<S, exy::value_tag>
-   && exy::signatures_all_of_tag<S, exy::value_tag, _::mp_compose<_::mp_list, _::mp_is_unit_list>>;
+    = _::mp_size<exy::signatures_fold_tag<
+          S, exy::value_tag, _::mp_quote<_::mp_list>, _::mp_quote<std::tuple>>>::value
+   == 1;
 
 template <typename S>
 concept exception_error_signatures = exy::signatures_all_of_tag<
@@ -24,8 +26,8 @@ inline constexpr struct
 {
     template <typename F>
     using _value_type = std::optional<exy::signatures_fold_tag<
-        exy::signatures_of<F>, exy::value_tag, _::mp_quote<std::common_type_t>,
-        _::mp_compose<_::mp_list, _::mp_only>>>;
+        exy::signatures_of<F>, exy::value_tag, _::mp_quote<std::type_identity_t>,
+        _::mp_quote<std::tuple>>>;
 
     template <typename F>
     struct _state : exy::state_base
@@ -42,7 +44,7 @@ inline constexpr struct
         static constexpr void* call(exy::state_ref, exy::storage_ref result)
         {
             result.get<S>([&](auto&&... args) {
-                result.emplace<exy::value_tag(T)>(exy_fwd(args)...);
+                result.emplace_raw<T>(std::in_place, exy_fwd(args)...);
             });
             return nullptr;
         }
@@ -56,7 +58,7 @@ inline constexpr struct
         template <exy::signature_with_tag<exy::stopped_tag> S>
         static constexpr void* call(exy::state_ref, exy::storage_ref result) noexcept
         {
-            result.emplace<exy::value_tag(T)>(std::nullopt);
+            result.emplace_raw<T>(std::nullopt);
             return nullptr;
         }
     };
@@ -70,9 +72,7 @@ inline constexpr struct
         _state<F>                       state(exy_mov(f));
         exy::storage<F::storage_spec()> result;
         F::template op<_c<_value_type<F>>, &_state<F>::_s>::start(state, result);
-        return exy::storage_ref(result).get<exy::value_tag(_value_type<F>)>([&](auto&& arg) {
-            return exy_fwd(arg);
-        });
+        return exy::storage_ref(result).get_raw<_value_type<F>>();
     }
 } sync_wait;
 } // namespace exy

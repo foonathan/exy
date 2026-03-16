@@ -58,11 +58,17 @@ public:
     constexpr storage_ref(storage<Spec>& s) noexcept : _ptr(&s._buffer)
     {}
 
+    template <typename T>
+    constexpr void emplace_raw(auto&&... args)
+    {
+        ::new(_ptr) T(exy_fwd(args)...);
+    }
+
     template <typename S>
     constexpr void emplace(auto&&... args)
     {
         [&]<typename Tag, typename... T>(std::type_identity<Tag(T...)>) {
-            ::new(_ptr) exy::pack<T...>(exy::make_pack(static_cast<T>(exy_fwd(args))...));
+            emplace_raw<exy::pack<T...>>(exy::make_pack(exy_fwd(args)...));
         }(std::type_identity<S>{});
     }
 
