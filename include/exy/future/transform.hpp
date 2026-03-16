@@ -50,25 +50,20 @@ struct _t : exy::future_base
     template <typename Cont, auto... Path>
     struct op
     {
-        struct _c
+        struct _c : exy::adapter_continuation<_c, Cont>
         {
-            template <typename S>
-            static constexpr void* call(exy::state_ref s, exy::storage_ref result)
+            template <exy::signature_with_tag<exy::value_tag> S>
+            static constexpr exy::continuation continuation_for(
+                exy::state_ref s, exy::storage_ref result
+            ) noexcept
             {
                 state& self = s.get<Path...>();
 
-                if constexpr (std::same_as<exy::signature_tag<S>, exy::value_tag>)
-                {
-                    using value_type       = exy::signature_argument<S>;
-                    using transformed_type = exy::invoke_result_t<Fn&&, value_type>;
-                    EXY_TAIL_CALL exy::set_value_or_exception<Cont, transformed_type>(result, [&] {
-                        return exy_invoke(exy_mov(self._fn), result.get<value_type>());
-                    })(s, result);
-                }
-                else
-                {
-                    EXY_TAIL_CALL Cont::template call<S>(s, result);
-                }
+                using value_type       = exy::signature_argument<S>;
+                using transformed_type = exy::invoke_result_t<Fn&&, value_type>;
+                return exy::set_value_or_exception<Cont, transformed_type>(result, [&] {
+                    return exy_invoke(exy_mov(self._fn), result.get<value_type>());
+                });
             }
         };
 
