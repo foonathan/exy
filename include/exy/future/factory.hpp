@@ -8,19 +8,19 @@
 
 namespace exy::futures
 {
-template <typename Tag, typename T>
+template <typename Tag, typename... Ts>
 struct _f : exy::future_base
 {
-    EXY_NO_UNIQUE_ADDRESS T _value;
+    EXY_NO_UNIQUE_ADDRESS exy::pack<Ts...> _pack;
 
     using signatures = exy::signatures_insert_exception<
-        exy::signatures<Tag(T)>, std::is_nothrow_move_constructible_v<T>>;
+        exy::signatures<Tag(Ts...)>, (std::is_nothrow_move_constructible_v<Ts> && ...)>;
 
     struct state : exy::state_base
     {
-        EXY_NO_UNIQUE_ADDRESS T _value;
+        EXY_NO_UNIQUE_ADDRESS exy::pack<Ts...> _pack;
 
-        constexpr explicit state(_f&& self) : _value(exy_mov(self)._value) {}
+        constexpr explicit state(_f&& self) : _pack(exy_mov(self)._pack) {}
     };
 
     static consteval auto storage_spec() noexcept
@@ -34,10 +34,18 @@ struct _f : exy::future_base
         static constexpr void* start(exy::state_ref s, exy::storage_ref result)
         {
             state& self = s.get<Path...>();
-            EXY_TAIL_CALL
-            exy::set_or_exception<Cont, Tag(T)>(result, [&] noexcept -> T&& {
-                return exy_mov(self._value);
-            })(s, result);
+
+            auto          cont = self._pack([&](auto&&... args) {
+                try
+                {
+                    return exy::set<Cont, Tag(Ts...)>(result, exy_mov(args)...);
+                }
+                catch (...)
+                {
+                    return exy::set_exception<Cont>(result);
+                }
+            });
+            EXY_TAIL_CALL cont(s, result);
         }
     };
 };
@@ -45,10 +53,10 @@ struct _f : exy::future_base
 template <typename Tag>
 struct factory_t
 {
-    template <exy::movable T>
-    static constexpr _f<Tag, std::decay_t<T>> operator()(T&& value)
+    template <exy::movable... Ts>
+    static constexpr _f<Tag, std::decay_t<Ts>...> operator()(Ts&&... args)
     {
-        return {{}, exy_fwd(value)};
+        return {{}, exy::make_pack(exy_fwd(args)...)};
     }
 };
 

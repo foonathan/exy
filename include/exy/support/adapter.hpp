@@ -37,13 +37,18 @@ template <typename Derived, typename Cont>
 struct adapter_continuation
 {
     template <typename S>
+        requires requires (exy::state_ref s, exy::storage_ref result) {
+            Derived::template continuation_for<S>(s, result);
+        }
     static constexpr void* call(exy::state_ref s, exy::storage_ref result)
-        requires requires { Derived::template continuation_for<S>(s, result); }
     {
         EXY_TAIL_CALL Derived::template continuation_for<S>(s, result)(s, result);
     }
 
     template <typename S>
+        requires (!requires (exy::state_ref s, exy::storage_ref result) {
+            Derived::template continuation_for<S>(s, result);
+        })
     static constexpr void* call(exy::state_ref s, exy::storage_ref result)
     {
         EXY_TAIL_CALL Cont::template call<S>(s, result);

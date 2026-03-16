@@ -4,7 +4,7 @@
 #ifndef EXY_SYNC_WAIT_HPP_INCLUDED
 #define EXY_SYNC_WAIT_HPP_INCLUDED
 
-#include <exy/support/base.hpp>
+#include <exy/support/future.hpp>
 
 namespace exy
 {
@@ -13,7 +13,7 @@ inline constexpr struct
     template <typename F>
     using _value_type = exy::signatures_fold_tag<
         exy::signatures_of<F>, exy::value_tag, _::mp_quote<std::common_type_t>,
-        _::mp_quote<exy::signature_argument>>;
+        _::mp_compose<_::mp_list, _::mp_only>>;
 
     template <typename F>
     struct _state : exy::state_base
@@ -29,14 +29,16 @@ inline constexpr struct
         template <exy::signature_with_tag<exy::value_tag> S>
         static constexpr void* call(exy::state_ref, exy::storage_ref result)
         {
-            result.emplace<T>(result.template get<exy::signature_argument<S>>());
+            result.get<S>([&](auto&&... args) {
+                result.emplace<exy::value_tag(T)>(exy_fwd(args)...);
+            });
             return nullptr;
         }
 
         template <exy::signature_with_tag<exy::error_tag> S>
         static constexpr void* call(exy::state_ref, exy::storage_ref result)
         {
-            throw result.template get<exy::signature_argument<S>>();
+            result.get<S>([&](const std::exception_ptr& e) { std::rethrow_exception(e); });
         }
     };
 
@@ -46,7 +48,9 @@ inline constexpr struct
         _state<F>                       state(exy_mov(f));
         exy::storage<F::storage_spec()> result;
         F::template op<_c<_value_type<F>>, &_state<F>::_s>::start(state, result);
-        return exy::storage_ref(result).get<_value_type<F>>();
+        return exy::storage_ref(result).get<exy::value_tag(_value_type<F>)>([&](auto&& arg) {
+            return exy_fwd(arg);
+        });
     }
 } sync_wait;
 } // namespace exy

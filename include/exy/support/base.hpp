@@ -42,7 +42,11 @@ namespace exy
 namespace _
 {
     using namespace boost::mp11;
-}
+
+    template <typename L>
+        requires (mp_size<L>::value == 1)
+    using mp_only = mp_front<L>;
+} // namespace _
 
 template <auto C>
 using constant = std::integral_constant<decltype(C), C>;
@@ -53,6 +57,16 @@ constexpr auto max(const auto& h, const auto&... t) noexcept
     (void)(((t >= h) ? result = t, 0 : 0), ...);
     return result;
 }
+
+constexpr auto make_pack(exy::movable auto&&... args) noexcept
+{
+    return [... elements = exy_fwd(args)](auto&& fn) mutable -> decltype(auto) {
+        return exy_fwd(fn)(exy_mov(elements)...);
+    };
+}
+
+template <exy::movable_object... Ts>
+using pack = decltype(make_pack(std::declval<Ts>()...));
 } // namespace exy
 
 #endif // EXY_SUPPORT_BASE_HPP_INCLUDED

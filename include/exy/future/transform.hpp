@@ -43,7 +43,9 @@ struct _t : exy::future_base
 
     static consteval auto storage_spec() noexcept
     {
-        return exy::storage_spec::get(exy::signatures_of<Base>{}, signatures());
+        return exy::max(
+            exy::storage_spec::get(exy::signatures_of<Base>{}), exy::storage_spec::get(signatures())
+        );
     }
 
     template <typename Cont, auto... Path>
@@ -58,10 +60,19 @@ struct _t : exy::future_base
             {
                 state& self = s.get<Path...>();
 
-                using value_type       = exy::signature_argument<S>;
-                using transformed_type = exy::invoke_result_t<Fn&&, value_type>;
-                return exy::set_or_exception<Cont, TagTo(transformed_type)>(result, [&] {
-                    return exy_invoke(exy_mov(self._fn), result.get<value_type>());
+                using transformed_type
+                    = exy::signature_arguments_as<S, _::mp_bind_front<exy::invoke_result_t, Fn&&>>;
+                return result.get<S>([&](auto&&... args) {
+                    try
+                    {
+                        return exy::set<Cont, TagTo(transformed_type)>(
+                            result, exy_invoke(exy_mov(self._fn), exy_fwd(args)...)
+                        );
+                    }
+                    catch (...)
+                    {
+                        return exy::set_exception<Cont>(result);
+                    }
                 });
             }
         };
