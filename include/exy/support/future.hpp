@@ -18,9 +18,13 @@ struct future_base
 
 template <typename T>
 concept future = std::derived_from<T, future_base>;
+template <typename T>
+using is_future = std::bool_constant<future<T>>;
 
 template <typename F>
 using signatures_of = typename F::signatures;
+template <typename F>
+using state_of = typename F::state;
 
 using continuation = void* (*)(exy::state_ref, exy::storage_ref);
 

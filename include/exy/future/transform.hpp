@@ -10,6 +10,10 @@
 namespace exy
 {
 template <typename Fn, typename S, typename Tag>
+using invoke_results_of_signature_tag = _::mp_unique<exy::signatures_fold_tag<
+    S, Tag, _::mp_quote<_::mp_list>, _::mp_bind_front<exy::invoke_result_t, Fn>>>;
+
+template <typename Fn, typename S, typename Tag>
 concept invocable_with_signature_tag
     = exy::signatures_all_of_tag<S, Tag, _::mp_bind_front<exy::is_invocable, Fn>>;
 } // namespace exy

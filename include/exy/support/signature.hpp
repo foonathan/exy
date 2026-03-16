@@ -77,6 +77,10 @@ using signatures_transform_tag = _::mp_unique<_::mp_transform_if_q<
         _::mp_bind_back<exy::signature_arguments_as, QFn>::template fn, TagTo::template make>,
     S>>;
 
+template <typename S, typename Tag, typename OtherS>
+using signatures_merge_on_tag
+    = _::mp_unique<_::mp_append<_::mp_remove_if<S, Tag::template is>, OtherS>>;
+
 template <typename S, typename Tag, typename QPredicate>
 constexpr bool signatures_all_of_tag = _::mp_all_of_q<
     _::mp_filter<Tag::template is, S>,
