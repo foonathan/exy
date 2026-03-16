@@ -8,6 +8,16 @@
 
 namespace exy
 {
+template <typename S>
+concept single_value_signatures
+    = exy::signatures_all_of_tag<S, exy::value_tag, _::mp_compose<_::mp_list, _::mp_is_unit_list>>;
+
+template <typename S>
+concept exception_error_signatures = exy::signatures_all_of_tag<
+    S, exy::error_tag,
+    _::mp_compose<
+        _::mp_list, _::mp_bind_back<std::is_same, _::mp_list<std::exception_ptr>>::template fn>>;
+
 inline constexpr struct
 {
     template <typename F>
@@ -42,7 +52,8 @@ inline constexpr struct
         }
     };
 
-    template <exy::future F>
+    template <exy::future F, typename S = exy::signatures_of<F>>
+        requires exy::single_value_signatures<S> && exy::exception_error_signatures<S>
     static constexpr auto operator()(F&& f)
     {
         _state<F>                       state(exy_mov(f));

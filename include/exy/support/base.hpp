@@ -44,7 +44,10 @@ namespace _
     using namespace boost::mp11;
 
     template <typename L>
-        requires (mp_size<L>::value == 1)
+    using mp_is_unit_list = std::bool_constant<mp_size<L>::value == 1>;
+
+    template <typename L>
+        requires mp_is_unit_list<L>::value
     using mp_only = mp_front<L>;
 } // namespace _
 
