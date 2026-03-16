@@ -38,11 +38,11 @@ struct _f : exy::future_base
             auto          cont = self._pack([&](auto&&... args) {
                 try
                 {
-                    return exy::set<Cont, Tag(Ts...)>(result, exy_mov(args)...);
+                    return exy::set<signatures, Cont, Tag(Ts...)>(result, exy_mov(args)...);
                 }
                 catch (...)
                 {
-                    return exy::set_exception<Cont>(result);
+                    return exy::set_exception<signatures, Cont>(result);
                 }
             });
             EXY_TAIL_CALL cont(s, result);

@@ -11,10 +11,10 @@ namespace exyf = exy::futures;
 
 int main()
 {
-    auto pipeline = exyf::stopped() | exyf::transform([](int a, int b) { return a + b; })
+    auto pipeline = exyf::value(11, 42) | exyf::transform([](int a, int b) { return a + b; })
                   | exyf::upon_error([](std::exception_ptr&&) { return 42; })
                   | exyf::upon_stopped([]() { return -1; });
-    auto result   = exy::sync_wait(exy_mov(pipeline));
+    auto [result] = *exy::sync_wait(exy_mov(pipeline));
     std::printf("%d\n", result);
 }
 

@@ -64,13 +64,13 @@ struct _t : exy::future_base
                 return result.get<S>([&](auto&&... args) {
                     try
                     {
-                        return exy::set<Cont, TagTo(transformed_type)>(
+                        return exy::set<signatures, Cont, TagTo(transformed_type)>(
                             result, exy_invoke(exy_mov(self._fn), exy_fwd(args)...)
                         );
                     }
                     catch (...)
                     {
-                        return exy::set_exception<Cont>(result);
+                        return exy::set_exception<signatures, Cont>(result);
                     }
                 });
             }
