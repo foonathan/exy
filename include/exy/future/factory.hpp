@@ -8,19 +8,19 @@
 
 namespace exy::futures
 {
-template <typename T>
-struct _v : exy::future_base
+template <typename Tag, typename T>
+struct _f : exy::future_base
 {
     EXY_NO_UNIQUE_ADDRESS T _value;
 
     using signatures = exy::signatures_insert_exception<
-        exy::signatures<exy::value_tag(T)>, std::is_nothrow_move_constructible_v<T>>;
+        exy::signatures<Tag(T)>, std::is_nothrow_move_constructible_v<T>>;
 
     struct state : exy::state_base
     {
         EXY_NO_UNIQUE_ADDRESS T _value;
 
-        constexpr explicit state(_v&& self) : _value(exy_mov(self)._value) {}
+        constexpr explicit state(_f&& self) : _value(exy_mov(self)._value) {}
     };
 
     static consteval auto storage_spec() noexcept
@@ -33,22 +33,27 @@ struct _v : exy::future_base
     {
         static constexpr void* start(exy::state_ref s, exy::storage_ref result)
         {
-            state&        self = s.get<Path...>();
-            EXY_TAIL_CALL exy::set_value_or_exception<Cont, T>(result, [&] noexcept -> T&& {
+            state& self = s.get<Path...>();
+            EXY_TAIL_CALL
+            exy::set_or_exception<Cont, Tag(T)>(result, [&] noexcept -> T&& {
                 return exy_mov(self._value);
             })(s, result);
         }
     };
 };
 
-inline constexpr struct value_t
+template <typename Tag>
+struct factory_t
 {
     template <exy::movable T>
-    static constexpr _v<std::decay_t<T>> operator()(T&& value)
+    static constexpr _f<Tag, std::decay_t<T>> operator()(T&& value)
     {
         return {{}, exy_fwd(value)};
     }
-} value;
+};
+
+inline constexpr factory_t<exy::value_tag> value;
+inline constexpr factory_t<exy::error_tag> error;
 } // namespace exy::futures
 
 #endif // EXY_FUTURE_FACTORY_HPP_INCLUDED

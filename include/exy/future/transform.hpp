@@ -8,31 +8,29 @@
 
 namespace exy
 {
-template <typename Fn, typename S>
-concept invocable_with_signature_values
-    = exy::signatures_all_of_tag<S, exy::value_tag, _::mp_bind_front<exy::is_invocable, Fn>>;
+template <typename Fn, typename S, typename Tag>
+concept invocable_with_signature_tag
+    = exy::signatures_all_of_tag<S, Tag, _::mp_bind_front<exy::is_invocable, Fn>>;
 } // namespace exy
 
 namespace exy::futures
 {
-template <typename Base, typename Fn>
+template <typename Base, typename TagFrom, typename Fn, typename TagTo>
 struct _t : exy::future_base
 {
     EXY_NO_UNIQUE_ADDRESS Base _base;
     EXY_NO_UNIQUE_ADDRESS Fn   _fn;
 
     using _transformed_values = exy::signatures_transform_tag<
-        exy::signatures_of<Base>, exy::value_tag, _::mp_bind_front<exy::invoke_result_t, Fn>>;
+        exy::signatures_of<Base>, TagFrom, _::mp_bind_front<exy::invoke_result_t, Fn>, TagTo>;
     using signatures = exy::signatures_insert_exception<
         _transformed_values,
         // The function must be nothrow.
         exy::signatures_all_of_tag<
-            exy::signatures_of<Base>, exy::value_tag,
-            _::mp_bind_front<exy::is_nothrow_invocable, Fn>>
+            exy::signatures_of<Base>, TagFrom, _::mp_bind_front<exy::is_nothrow_invocable, Fn>>
             // And we must be able to nothrow move construct it into the storage.
             && exy::signatures_all_of_tag<
-                _transformed_values, exy::value_tag,
-                _::mp_bind_front<std::is_nothrow_move_constructible>>>;
+                _transformed_values, TagTo, _::mp_bind_front<std::is_nothrow_move_constructible>>>;
 
     struct state : exy::state_base
     {
@@ -52,7 +50,7 @@ struct _t : exy::future_base
     {
         struct _c : exy::adapter_continuation<_c, Cont>
         {
-            template <exy::signature_with_tag<exy::value_tag> S>
+            template <exy::signature_with_tag<TagFrom> S>
             static constexpr exy::continuation continuation_for(
                 exy::state_ref s, exy::storage_ref result
             ) noexcept
@@ -61,7 +59,7 @@ struct _t : exy::future_base
 
                 using value_type       = exy::signature_argument<S>;
                 using transformed_type = exy::invoke_result_t<Fn&&, value_type>;
-                return exy::set_value_or_exception<Cont, transformed_type>(result, [&] {
+                return exy::set_or_exception<Cont, TagTo(transformed_type)>(result, [&] {
                     return exy_invoke(exy_mov(self._fn), result.get<value_type>());
                 });
             }
@@ -74,16 +72,22 @@ struct _t : exy::future_base
     };
 };
 
-inline constexpr struct transform_t
+template <typename TagFrom, typename TagTo>
+struct transform_t
 {
     template <
-        exy::future                             F, typename S = exy::signatures_of<F>,
-        exy::invocable_with_signature_values<S> Fn>
-    static constexpr auto operator()(F&& f, Fn&& fn) -> _t<F, std::decay_t<Fn>>
+        exy::future                                   F, typename S = exy::signatures_of<F>,
+        exy::invocable_with_signature_tag<S, TagFrom> Fn>
+    static constexpr auto operator()(F&& f, Fn&& fn) -> _t<F, TagFrom, std::decay_t<Fn>, TagTo>
     {
         return {{}, exy_mov(f), exy_fwd(fn)};
     }
-} transform;
+};
+
+inline constexpr transform_t<exy::value_tag, exy::value_tag> transform;
+inline constexpr transform_t<exy::error_tag, exy::error_tag> transform_error;
+
+inline constexpr transform_t<exy::error_tag, exy::value_tag> upon_error;
 } // namespace exy::futures
 
 #endif // EXY_FUTURE_TRANSFORM_HPP_INCLUDED
