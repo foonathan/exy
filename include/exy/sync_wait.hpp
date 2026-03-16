@@ -54,7 +54,9 @@ inline constexpr struct
 
     template <exy::future F, typename S = exy::signatures_of<F>>
         requires exy::single_value_signatures<S> && exy::exception_error_signatures<S>
-    static constexpr auto operator()(F&& f)
+    static constexpr auto operator()(F&& f) noexcept(
+        !_::mp_set_contains<S, exy::error_tag(std::exception_ptr)>::value
+    )
     {
         _state<F>                       state(exy_mov(f));
         exy::storage<F::storage_spec()> result;
