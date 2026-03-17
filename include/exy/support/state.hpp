@@ -30,6 +30,12 @@ public:
         }(_ptr, exy::constant<MemPtrs>{}...);
     }
 
+    template <typename T>
+    constexpr T& get_root() const noexcept
+    {
+        return static_cast<T&>(*_ptr);
+    }
+
 private:
     template <typename T, typename C, T C::* Mem>
     static constexpr T& apply_member(state_base* base, exy::constant<Mem>) noexcept

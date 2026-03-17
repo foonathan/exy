@@ -8,6 +8,7 @@ include(Catch)
 add_executable(exy_tests
     futures/and_then.cpp
     futures/factory.cpp
+    futures/schedule.cpp
     futures/transform.cpp
 )
 target_link_libraries(exy_tests PRIVATE exy_dev Catch2::Catch2WithMain)

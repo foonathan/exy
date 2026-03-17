@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: BSL-1.0
 
 #include <any>
+#include <atomic>
 #include <memory>
+#include <thread>
 #include <tuple>
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -36,8 +38,9 @@ struct test_result
     std::any tag;
     std::any args;
     std::string (*fn_to_string)(const std::any&);
+    std::thread::id completion_id;
 
-    explicit test_result(auto tag, auto&&... args)
+    explicit test_result(std::thread::id completion_id, auto tag, auto&&... args)
     : tag(tag), args(
                     std::make_shared<std::tuple<std::decay_t<decltype(args)>...>>(
                         std::make_tuple(exy_fwd(args)...)
@@ -52,24 +55,47 @@ struct test_result
               },
               tuple
           );
-      })
+      }),
+      completion_id(completion_id)
     {}
 
     friend std::ostream& operator<<(std::ostream& os, const test_result& result)
     {
-        return os << result.fn_to_string(result.args);
+        return os << result.fn_to_string(result.args) << " on "
+                  << (result.completion_id == std::this_thread::get_id() ? "main thread"
+                                                                         : "background thread");
     }
 };
+
+inline constexpr struct thread_change_t
+{
+} thread_change;
+inline constexpr struct no_thread_change_t
+{
+} no_thread_change;
 
 template <typename Tag, typename... Args>
 struct test_result_matcher : Catch::Matchers::MatcherGenericBase
 {
     std::tuple<Args...> expected_args;
+    std::optional<bool> expected_thread_change;
 
     test_result_matcher(Tag, Args&&... args) : expected_args(exy_mov(args)...) {}
+    test_result_matcher(thread_change_t, Tag, Args&&... args)
+    : expected_args(exy_mov(args)...), expected_thread_change(true)
+    {}
+    test_result_matcher(no_thread_change_t, Tag, Args&&... args)
+    : expected_args(exy_mov(args)...), expected_thread_change(false)
+    {}
 
     bool match(const test_result& result) const
     {
+        if (expected_thread_change)
+        {
+            if ((result.completion_id != std::this_thread::get_id()) != *expected_thread_change)
+                return false;
+        }
+
         if (result.tag.type() != typeid(Tag))
             return false;
 
@@ -87,6 +113,15 @@ struct test_result_matcher : Catch::Matchers::MatcherGenericBase
             },
             expected_args
         );
+        ss << " on ";
+        if (expected_thread_change)
+        {
+            ss << (*expected_thread_change ? "background thread" : "main thread");
+        }
+        else
+        {
+            ss << "any thread";
+        }
         return exy_mov(ss).str();
     }
 };
@@ -96,7 +131,8 @@ inline constexpr struct test_run_t
     template <typename F>
     struct _state : exy::state_base
     {
-        exy::state_of<F> _s;
+        exy::state_of<F>  _s;
+        std::atomic<bool> _done = false;
 
         constexpr explicit _state(
             F&& f
@@ -113,14 +149,22 @@ inline constexpr struct test_run_t
         );
     }
 
+    template <typename F>
     struct _c
     {
         template <typename S>
-        static constexpr void* call(exy::state_ref, exy::storage_ref result)
+        static constexpr void* call(exy::state_ref s, exy::storage_ref result)
         {
+            auto& self = s.get_root<_state<F>>();
+
             result.get<S>([&](auto&&... args) {
-                result.emplace_raw<test_result>(exy::signature_tag<S>{}, exy_fwd(args)...);
+                result.emplace_raw<test_result>(
+                    std::this_thread::get_id(), exy::signature_tag<S>{}, exy_fwd(args)...
+                );
             });
+            self._done.store(true, std::memory_order_release);
+            self._done.notify_one();
+
             return nullptr;
         }
     };
@@ -128,9 +172,13 @@ inline constexpr struct test_run_t
     template <exy::future F>
     static constexpr test_result operator()(F&& f)
     {
-        _state<F>                        state(exy_mov(f));
+        _state<F> state(exy_mov(f));
+
         exy::storage<_storage_spec<F>()> result;
-        F::template op<_c, &_state<F>::_s>::start(state, result);
+        F::template op<_c<F>, &_state<F>::_s>::start(state, result);
+
+        state._done.wait(false, std::memory_order_acquire);
+
         return exy::storage_ref(result).get_raw<test_result>();
     }
 } test_run;

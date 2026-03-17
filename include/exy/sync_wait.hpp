@@ -4,6 +4,7 @@
 #ifndef EXY_SYNC_WAIT_HPP_INCLUDED
 #define EXY_SYNC_WAIT_HPP_INCLUDED
 
+#include <atomic>
 #include <optional>
 #include <tuple>
 #include <exy/support/future.hpp>
@@ -32,38 +33,53 @@ inline constexpr struct sync_wait_t
     template <typename F>
     struct _state : exy::state_base
     {
-        exy::state_of<F> _s;
+        exy::state_of<F>   _s;
+        std::exception_ptr _ex   = {};
+        std::atomic<bool>  _done = false;
 
         constexpr explicit _state(
             F&& f
         ) noexcept(std::is_nothrow_constructible_v<exy::state_of<F>, F&&>)
         : _s(exy_mov(f))
         {}
+
+        void complete() noexcept
+        {
+            _done.store(true, std::memory_order_release);
+            _done.notify_one();
+        }
     };
 
-    template <typename T>
+    template <typename F>
     struct _c
     {
         template <exy::signature_with_tag<exy::value_tag> S>
-        static constexpr void* call(exy::state_ref, exy::storage_ref result)
+        static constexpr void* call(exy::state_ref s, exy::storage_ref result)
         {
+            auto& self = s.get_root<_state<F>>();
             result.get<S>([&](auto&&... args) {
-                result.emplace_raw<T>(std::in_place, exy_fwd(args)...);
+                result.emplace_raw<_value_type<F>>(std::in_place, exy_fwd(args)...);
             });
+            self.complete();
             return nullptr;
         }
 
         template <exy::signature_with_tag<exy::error_tag> S>
-        static constexpr void* call(exy::state_ref, exy::storage_ref result)
+        static constexpr void* call(exy::state_ref s, exy::storage_ref result)
         {
-            result.get<S>([&](const std::exception_ptr& e) { std::rethrow_exception(e); });
+            auto& self = s.get_root<_state<F>>();
+            result.get<S>([&](const std::exception_ptr& e) { self._ex = e; });
+            self.complete();
+            return nullptr;
         }
 
         template <exy::signature_with_tag<exy::stopped_tag> S>
-        static constexpr void* call(exy::state_ref, exy::storage_ref result) noexcept
+        static constexpr void* call(exy::state_ref s, exy::storage_ref result)
         {
-            result.get<S>([](auto&&...) {});
-            result.emplace_raw<T>(std::nullopt);
+            auto& self = s.get_root<_state<F>>();
+            result.get<S>([](auto...) {});
+            result.emplace_raw<_value_type<F>>(std::nullopt);
+            self.complete();
             return nullptr;
         }
     };
@@ -74,9 +90,14 @@ inline constexpr struct sync_wait_t
         !_::mp_set_contains<S, exy::error_tag(std::exception_ptr)>::value
     )
     {
-        _state<F>                       state(exy_mov(f));
+        _state<F> state(exy_mov(f));
+
         exy::storage<F::storage_spec()> result;
-        F::template op<_c<_value_type<F>>, &_state<F>::_s>::start(state, result);
+        F::template op<_c<F>, &_state<F>::_s>::start(state, result);
+        state._done.wait(false, std::memory_order_acquire);
+
+        if (state._ex)
+            std::rethrow_exception(state._ex);
         return exy::storage_ref(result).get_raw<_value_type<F>>();
     }
 } sync_wait;

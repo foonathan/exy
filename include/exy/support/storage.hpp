@@ -54,6 +54,8 @@ private:
 class storage_ref
 {
 public:
+    constexpr storage_ref() noexcept : _ptr(nullptr) {}
+
     template <storage_spec Spec>
     constexpr storage_ref(storage<Spec>& s) noexcept : _ptr(&s._buffer)
     {}

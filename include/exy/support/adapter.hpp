@@ -23,7 +23,7 @@ struct adapter_proxy : Fn, adapter
 };
 
 template <typename Tag>
-constexpr auto make_adaptor_proxy(exy::movable_object auto&&... args)
+constexpr auto make_adaptor_proxy(exy::movable auto&&... args)
 {
     return adapter_proxy([... args = exy_fwd(args)](auto&& head) mutable {
         return Tag()(exy_fwd(head), exy_fwd(args)...);
