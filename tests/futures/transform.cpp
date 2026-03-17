@@ -32,6 +32,10 @@ TEMPLATE_TEST_CASE(
     REQUIRE_SIGNATURES(binary_to_int, to_tag(int));
     REQUIRE_FUTURE(binary_to_int, to_tag(), 53);
 
+    auto to_void = factory() | transform([]() noexcept {});
+    REQUIRE_SIGNATURES(to_void, to_tag());
+    REQUIRE_FUTURE(to_void, to_tag());
+
     auto throwing_fn = factory() | transform([] { return 0; });
     REQUIRE_SIGNATURES(throwing_fn, to_tag(int), exy::error_tag(std::exception_ptr));
     REQUIRE_FUTURE(throwing_fn, to_tag(), 0);

@@ -73,9 +73,17 @@ struct _t : exy::future_base
                 return result.get<S>([&](auto&&... args) {
                     try
                     {
-                        return exy::set<signatures, Cont, TagTo(transformed_type)>(
-                            result, exy_invoke(exy_mov(self._fn), exy_fwd(args)...)
-                        );
+                        if constexpr (std::is_void_v<transformed_type>)
+                        {
+                            exy_invoke(exy_mov(self._fn), exy_fwd(args)...);
+                            return exy::set<signatures, Cont, TagTo()>(result);
+                        }
+                        else
+                        {
+                            return exy::set<signatures, Cont, TagTo(transformed_type)>(
+                                result, exy_invoke(exy_mov(self._fn), exy_fwd(args)...)
+                            );
+                        }
                     }
                     catch (...)
                     {

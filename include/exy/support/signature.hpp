@@ -31,10 +31,16 @@ concept signature_with_tag = std::same_as<signature_tag<Signature>, Tag>;
 
 namespace exy
 {
+template <typename Tag, typename... T>
+using _make_signature = Tag(T...);
+template <typename Tag, typename... T>
+using make_signature = _::mp_eval_if_c<
+    std::same_as<_::mp_list<T...>, _::mp_list<void>>, Tag(), _make_signature, Tag, T...>;
+
 struct value_tag
 {
     template <typename... T>
-    using make = value_tag(T...);
+    using make = make_signature<value_tag, T...>;
 
     template <typename T>
     using is = std::bool_constant<signature_with_tag<T, value_tag>>;
@@ -42,7 +48,7 @@ struct value_tag
 struct error_tag
 {
     template <typename... T>
-    using make = error_tag(T...);
+    using make = make_signature<error_tag, T...>;
 
     template <typename T>
     using is = std::bool_constant<signature_with_tag<T, error_tag>>;
@@ -50,7 +56,7 @@ struct error_tag
 struct stopped_tag
 {
     template <typename... T>
-    using make = stopped_tag(T...);
+    using make = make_signature<stopped_tag, T...>;
 
     template <typename T>
     using is = std::bool_constant<signature_with_tag<T, stopped_tag>>;
