@@ -22,7 +22,7 @@ concept exception_error_signatures = exy::signatures_all_of_tag<
     _::mp_compose<
         _::mp_list, _::mp_bind_back<std::is_same, _::mp_list<std::exception_ptr>>::template fn>>;
 
-inline constexpr struct
+inline constexpr struct sync_wait_t
 {
     template <typename F>
     using _value_type = std::optional<exy::signatures_fold_tag<
@@ -32,9 +32,13 @@ inline constexpr struct
     template <typename F>
     struct _state : exy::state_base
     {
-        typename F::state _s;
+        exy::state_of<F> _s;
 
-        constexpr explicit _state(F&& f) : _s(exy_mov(f)) {}
+        constexpr explicit _state(
+            F&& f
+        ) noexcept(std::is_nothrow_constructible_v<exy::state_of<F>, F&&>)
+        : _s(exy_mov(f))
+        {}
     };
 
     template <typename T>
