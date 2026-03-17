@@ -33,3 +33,6 @@ target_compile_options(exy_dev INTERFACE -pedantic-errors -Werror -Wall -Wextra 
 add_executable(exy_prototype prototype.cpp)
 target_link_libraries(exy_prototype PRIVATE exy_dev)
 
+enable_testing()
+add_subdirectory(tests)
+
