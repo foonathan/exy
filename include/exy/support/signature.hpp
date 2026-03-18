@@ -84,7 +84,7 @@ using signatures_transform_tag = _::mp_unique<_::mp_transform_if_q<
     S>>;
 
 template <typename S, typename Tag, typename OtherS>
-using signatures_merge_on_tag
+using signatures_replace_tag
     = _::mp_unique<_::mp_append<_::mp_remove_if<S, Tag::template is>, OtherS>>;
 
 template <typename S, typename Tag, typename QPredicate>

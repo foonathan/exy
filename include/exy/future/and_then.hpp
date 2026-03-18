@@ -32,7 +32,7 @@ struct _at : exy::future_base
     using _state_is_nothrow_constructible = std::is_nothrow_constructible<exy::state_of<F>, F&&>;
 
     using signatures = exy::signatures_insert_exception<
-        exy::signatures_merge_on_tag<
+        exy::signatures_replace_tag<
             exy::signatures_of<Base>, Tag,
             _::mp_flatten<_::mp_rename<
                 _::mp_transform<exy::signatures_of, _fn_result_types>, exy::signatures>>>,
