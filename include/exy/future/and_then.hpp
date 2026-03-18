@@ -44,18 +44,19 @@ struct _at : exy::future_base
 
     struct state : exy::state_base
     {
-        EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _base;
-        EXY_NO_UNIQUE_ADDRESS Fn                  _fn;
         _::mp_apply<
             std::variant,
-            _::mp_set_push_front<_::mp_transform<exy::state_of, _fn_result_types>, std::monostate>>
-            _inner;
+            _::mp_set_push_front<
+                _::mp_transform<exy::state_of, _fn_result_types>, exy::state_of<Base>>>
+                                 _sub_state;
+        EXY_NO_UNIQUE_ADDRESS Fn _fn;
 
         constexpr explicit state(_at&& self) noexcept(
             std::is_nothrow_constructible_v<exy::state_of<Base>, Base&&>
             && std::is_nothrow_move_constructible_v<Fn>
         )
-        : _base(exy_mov(self)._base), _fn(exy_mov(self)._fn)
+        : _sub_state(std::in_place_type<exy::state_of<Base>>, exy_mov(self)._base),
+          _fn(exy_mov(self)._fn)
         {}
     };
 
@@ -89,10 +90,10 @@ struct _at : exy::future_base
                     using inner_t       = decltype(inner);
                     using inner_state_t = exy::state_of<inner_t>;
 
-                    self._inner.template emplace<inner_state_t>(exy_mov(inner));
+                    self._sub_state.template emplace<inner_state_t>(exy_mov(inner));
 
                     static constexpr auto inner_path = [](exy::state_base* s) -> inner_state_t& {
-                        return std::get<inner_state_t>(static_cast<state*>(s)->_inner);
+                        return std::get<inner_state_t>(static_cast<state*>(s)->_sub_state);
                     };
                     return &inner_t::template op<Cont, Path..., inner_path>::start;
                 }
@@ -105,7 +106,11 @@ struct _at : exy::future_base
 
         static constexpr void* start(exy::state_ref s, exy::storage_ref result)
         {
-            EXY_TAIL_CALL Base::template op<_c, Path..., &state::_base>::start(s, result);
+            static constexpr auto base_path = [](exy::state_base* s) -> auto& {
+                return std::get<exy::state_of<Base>>(static_cast<state*>(s)->_sub_state);
+            };
+            EXY_TAIL_CALL
+            Base::template op<_c, Path..., base_path>::start(s, result);
         }
     };
 };
