@@ -105,6 +105,19 @@ constexpr bool signatures_none_of_tag = _::mp_none_of_q<
 template <typename S, bool Noexcept>
 using signatures_insert_exception
     = std::conditional_t<Noexcept, S, _::mp_set_push_back<S, exy::error_tag(std::exception_ptr)>>;
+
+template <typename S>
+concept single_value_signatures
+    = _::mp_size<exy::signatures_fold_tag<
+          S, exy::value_tag, _::mp_quote<_::mp_list>, _::mp_quote<std::tuple>>>::value
+   == 1;
+
+template <typename S>
+concept exception_error_signatures = exy::signatures_all_of_tag<
+    S, exy::error_tag,
+    _::mp_compose<
+        _::mp_list, _::mp_bind_back<std::is_same, _::mp_list<std::exception_ptr>>::template fn>>;
+
 } // namespace exy
 
 #endif // EXY_SUPPORT_SIGNATURE_HPP_INCLUDED

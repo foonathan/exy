@@ -208,3 +208,13 @@ struct move_only
     }
 };
 
+template <typename... S, exy::future F>
+constexpr auto with_signature(F&& f)
+{
+    struct F2 : F
+    {
+        using signatures = exy::_::mp_set_push_back<exy::signatures_of<F>, S...>;
+    };
+    return F2{exy_mov(f)};
+}
+

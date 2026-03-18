@@ -10,6 +10,7 @@ add_executable(exy_tests
     futures/factory.cpp
     futures/schedule.cpp
     futures/transform.cpp
+    futures/when_all.cpp
 )
 target_link_libraries(exy_tests PRIVATE exy_dev Catch2::Catch2WithMain)
 target_compile_options(exy_tests PRIVATE -Wno-c2y-extensions)

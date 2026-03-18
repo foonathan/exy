@@ -11,18 +11,6 @@
 
 namespace exy
 {
-template <typename S>
-concept single_value_signatures
-    = _::mp_size<exy::signatures_fold_tag<
-          S, exy::value_tag, _::mp_quote<_::mp_list>, _::mp_quote<std::tuple>>>::value
-   == 1;
-
-template <typename S>
-concept exception_error_signatures = exy::signatures_all_of_tag<
-    S, exy::error_tag,
-    _::mp_compose<
-        _::mp_list, _::mp_bind_back<std::is_same, _::mp_list<std::exception_ptr>>::template fn>>;
-
 inline constexpr struct sync_wait_t
 {
     template <typename F>

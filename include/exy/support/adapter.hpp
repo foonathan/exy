@@ -42,7 +42,11 @@ struct adapter_continuation
         }
     static constexpr void* call(exy::state_ref s, exy::storage_ref result)
     {
-        EXY_TAIL_CALL Derived::template continuation_for<S>(s, result)(s, result);
+        auto cont = Derived::template continuation_for<S>(s, result);
+        if (cont)
+            EXY_TAIL_CALL cont(s, result);
+        else
+            return nullptr;
     }
 
     template <typename S>
