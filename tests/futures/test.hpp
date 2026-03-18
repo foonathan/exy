@@ -157,11 +157,11 @@ inline constexpr struct test_run_t
         {
             auto& self = s.get_root<_state<F>>();
 
-            result.get<S>([&](auto&&... args) {
-                result.emplace_raw<test_result>(
-                    std::this_thread::get_id(), exy::signature_tag<S>{}, exy_fwd(args)...
-                );
-            });
+            auto [... args] = result.get<S>();
+            result.emplace_raw<test_result>(
+                std::this_thread::get_id(), exy::signature_tag<S>{}, exy_mov(args)...
+            );
+
             self._done.store(true, std::memory_order_release);
             self._done.notify_one();
 

@@ -70,26 +70,26 @@ struct _t : exy::future_base
 
                 using transformed_type
                     = exy::signature_arguments_as<S, _::mp_bind_front<exy::invoke_result_t, Fn&&>>;
-                return result.get<S>([&](auto&&... args) {
-                    try
+
+                try
+                {
+                    auto [... args] = result.get<S>();
+                    if constexpr (std::is_void_v<transformed_type>)
                     {
-                        if constexpr (std::is_void_v<transformed_type>)
-                        {
-                            exy_invoke(exy_mov(self._fn), exy_fwd(args)...);
-                            return exy::set<signatures, Cont, TagTo()>(result);
-                        }
-                        else
-                        {
-                            return exy::set<signatures, Cont, TagTo(transformed_type)>(
-                                result, exy_invoke(exy_mov(self._fn), exy_fwd(args)...)
-                            );
-                        }
+                        exy_invoke(exy_mov(self._fn), exy_fwd(args)...);
+                        return exy::set<signatures, Cont, TagTo()>(result);
                     }
-                    catch (...)
+                    else
                     {
-                        return exy::set_exception<signatures, Cont>(result);
+                        return exy::set<signatures, Cont, TagTo(transformed_type)>(
+                            result, exy_invoke(exy_mov(self._fn), exy_fwd(args)...)
+                        );
                     }
-                });
+                }
+                catch (...)
+                {
+                    return exy::set_exception<signatures, Cont>(result);
+                }
             }
         };
 

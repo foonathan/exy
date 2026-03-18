@@ -39,16 +39,17 @@ struct _f : exy::future_base
         {
             state& self = s.get<Path...>();
 
-            auto          cont = self._pack([&](auto&&... args) {
+            auto cont = [&] {
                 try
                 {
-                    return exy::set<signatures, Cont, Tag(Ts...)>(result, exy_mov(args)...);
+                    result.emplace_raw<exy::pack<Ts...>>(exy_mov(self._pack));
+                    return &Cont::template call<Tag(Ts...)>;
                 }
                 catch (...)
                 {
                     return exy::set_exception<signatures, Cont>(result);
                 }
-            });
+            }();
             EXY_TAIL_CALL cont(s, result);
         }
     };

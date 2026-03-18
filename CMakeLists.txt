@@ -13,7 +13,7 @@ endfunction()
 
 # Base target for common options.
 add_library(_exy_base INTERFACE)
-target_compile_features(_exy_base INTERFACE cxx_std_23)
+target_compile_features(_exy_base INTERFACE cxx_std_26)
 target_include_directories(_exy_base SYSTEM INTERFACE include)
 
 # Core library.

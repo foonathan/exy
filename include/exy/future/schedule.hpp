@@ -88,10 +88,13 @@ struct _co : exy::future_base
                 state& self = s.get<Path...>();
 
                 // Scheduling failed, destroy the previous result, and continue with the error.
-                self._prev_result.template get<PrevS>([](auto...) {});
-                result.get<S>([&](auto&&... args) {
-                    self._prev_result.template emplace<S>(exy_fwd(args)...);
-                });
+                {
+                    (void)self._prev_result.template get<PrevS>();
+
+                    auto [... args] = result.get<S>();
+                    self._prev_result.template emplace<S>(exy_mov(args)...);
+                }
+
                 result = self._prev_result;
                 EXY_TAIL_CALL Cont::template call<S>(s, result);
             }

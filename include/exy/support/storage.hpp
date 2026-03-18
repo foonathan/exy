@@ -84,12 +84,9 @@ public:
     }
 
     template <typename S>
-    constexpr decltype(auto) get(auto&& fn)
+    constexpr auto get() noexcept
     {
-        return [&]<typename Tag, typename... T>(std::type_identity<Tag(T...)>) -> decltype(auto) {
-            using pack = exy::pack<T...>;
-            return get_raw<pack>()(exy_fwd(fn));
-        }(std::type_identity<S>{});
+        return get_raw<exy::signature_arguments_as<S, _::mp_quote<exy::pack>>>();
     }
 
 private:

@@ -82,26 +82,24 @@ struct _at : exy::future_base
             {
                 state& self = s.get<Path...>();
 
-                return result.get<S>([&](auto&&... args) {
-                    try
-                    {
-                        auto inner          = exy_invoke(self._fn, exy_fwd(args)...);
-                        using inner_t       = decltype(inner);
-                        using inner_state_t = exy::state_of<inner_t>;
+                try
+                {
+                    auto [... args]     = result.get<S>();
+                    auto inner          = exy_invoke(self._fn, exy_mov(args)...);
+                    using inner_t       = decltype(inner);
+                    using inner_state_t = exy::state_of<inner_t>;
 
-                        self._inner.template emplace<inner_state_t>(exy_mov(inner));
+                    self._inner.template emplace<inner_state_t>(exy_mov(inner));
 
-                        static constexpr auto inner_path
-                            = [](exy::state_base* s) -> inner_state_t& {
-                            return std::get<inner_state_t>(static_cast<state*>(s)->_inner);
-                        };
-                        return &inner_t::template op<Cont, Path..., inner_path>::start;
-                    }
-                    catch (...)
-                    {
-                        return exy::set_exception<signatures, Cont>(result);
-                    }
-                });
+                    static constexpr auto inner_path = [](exy::state_base* s) -> inner_state_t& {
+                        return std::get<inner_state_t>(static_cast<state*>(s)->_inner);
+                    };
+                    return &inner_t::template op<Cont, Path..., inner_path>::start;
+                }
+                catch (...)
+                {
+                    return exy::set_exception<signatures, Cont>(result);
+                }
             }
         };
 

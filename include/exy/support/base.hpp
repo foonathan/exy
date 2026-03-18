@@ -13,6 +13,7 @@
 // IWYU pragma: end_exports
 
 #include <cassert>
+#include <tuple>
 #include <boost/mp11.hpp>
 
 #define exy_assert(...) assert(__VA_ARGS__)
@@ -68,22 +69,28 @@ constexpr auto max(const auto& h, const auto&... t) noexcept
     return result;
 }
 
-constexpr auto _make_pack(exy::movable_object auto&&... args) noexcept
+template <typename... Ts>
+struct pack : std::tuple<Ts...>
 {
-    // This one only accepts rvalues so we don't create different packes depending on the cv-ref
-    // qualifiers of the values.
-    return [... elements = exy_mov(args)](auto&& fn) mutable -> decltype(auto) {
-        return exy_fwd(fn)(exy_mov(elements)...);
-    };
-}
-constexpr auto make_pack(exy::movable auto&&... args) noexcept
-{
-    return _make_pack(auto(exy_fwd(args))...);
-}
+    using std::tuple<Ts...>::tuple;
+};
 
-template <exy::movable_object... Ts>
-using pack = decltype(make_pack(std::declval<Ts>()...));
+constexpr auto make_pack(auto&&... args) noexcept -> pack<std::decay_t<decltype(args)>...>
+{
+    return {exy_fwd(args)...};
+}
 } // namespace exy
+
+namespace std
+{
+template <typename... Ts>
+struct tuple_size<exy::pack<Ts...>> : std::integral_constant<std::size_t, sizeof...(Ts)>
+{};
+
+template <std::size_t I, typename... Ts>
+struct tuple_element<I, exy::pack<Ts...>> : std::tuple_element<I, std::tuple<Ts...>>
+{};
+} // namespace std
 
 #endif // EXY_SUPPORT_BASE_HPP_INCLUDED
 

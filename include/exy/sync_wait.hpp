@@ -57,9 +57,10 @@ inline constexpr struct sync_wait_t
         static constexpr void* call(exy::state_ref s, exy::storage_ref result)
         {
             auto& self = s.get_root<_state<F>>();
-            result.get<S>([&](auto&&... args) {
-                result.emplace_raw<_value_type<F>>(std::in_place, exy_fwd(args)...);
-            });
+
+            auto [... args] = result.get<S>();
+            result.emplace_raw<_value_type<F>>(std::in_place, exy_mov(args)...);
+
             self.complete();
             return nullptr;
         }
@@ -68,7 +69,10 @@ inline constexpr struct sync_wait_t
         static constexpr void* call(exy::state_ref s, exy::storage_ref result)
         {
             auto& self = s.get_root<_state<F>>();
-            result.get<S>([&](const std::exception_ptr& e) { self._ex = e; });
+
+            auto [ex] = result.get<S>();
+            self._ex  = ex;
+
             self.complete();
             return nullptr;
         }
@@ -77,7 +81,7 @@ inline constexpr struct sync_wait_t
         static constexpr void* call(exy::state_ref s, exy::storage_ref result)
         {
             auto& self = s.get_root<_state<F>>();
-            result.get<S>([](auto...) {});
+            (void)result.get<S>();
             result.emplace_raw<_value_type<F>>(std::nullopt);
             self.complete();
             return nullptr;
