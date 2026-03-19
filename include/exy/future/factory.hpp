@@ -16,16 +16,7 @@ struct _f : exy::future_base
     using signatures = exy::signatures_insert_exception<
         exy::signatures<Tag(Ts...)>, (std::is_nothrow_move_constructible_v<Ts> && ...)>;
 
-    struct state : exy::state_base
-    {
-        EXY_NO_UNIQUE_ADDRESS exy::pack<Ts...> _pack;
-
-        constexpr explicit state(_f&& self) noexcept(
-            (std::is_nothrow_move_constructible_v<Ts> && ...)
-        )
-        : _pack(exy_mov(self)._pack)
-        {}
-    };
+    using state = exy::state_base;
 
     static consteval auto storage_spec() noexcept
     {
@@ -35,14 +26,16 @@ struct _f : exy::future_base
     template <typename Cont>
     struct op
     {
-        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
+        static constexpr void* start(
+            exy::future_base& f, exy::state_base& s, exy::storage_ref result
+        )
         {
-            state& self = Cont::get(s);
+            _f& self = Cont::get(f, s);
 
             auto cont = [&] {
                 try
                 {
-                    result.emplace_raw<exy::pack<Ts...>>(exy_mov(self._pack));
+                    result.emplace_raw<exy::pack<Ts...>>(exy_mov(self)._pack);
                     return &Cont::template call<Tag(Ts...)>;
                 }
                 catch (...)
@@ -50,7 +43,7 @@ struct _f : exy::future_base
                     return exy::set_exception<signatures, Cont>(result);
                 }
             }();
-            EXY_TAIL_CALL cont(s, result);
+            EXY_TAIL_CALL cont(f, s, result);
         }
     };
 };

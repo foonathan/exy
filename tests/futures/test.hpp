@@ -134,11 +134,7 @@ inline constexpr struct test_run_t
         exy::state_of<F>  _s;
         std::atomic<bool> _done = false;
 
-        constexpr explicit _state(
-            F&& f
-        ) noexcept(std::is_nothrow_constructible_v<exy::state_of<F>, F&&>)
-        : _s(exy_mov(f))
-        {}
+        constexpr explicit _state(F& f) noexcept(exy::has_nothrow_constructible_state<F>) : _s(f) {}
     };
 
     template <typename F>
@@ -152,13 +148,17 @@ inline constexpr struct test_run_t
     template <typename F>
     struct _c
     {
+        static constexpr F& get(exy::future_base& f, exy::state_base&) noexcept
+        {
+            return static_cast<F&>(f);
+        }
         static constexpr exy::state_of<F>& get(exy::state_base& s) noexcept
         {
             return static_cast<_state<F>&>(s)._s;
         }
 
         template <typename S>
-        static constexpr void* call(exy::state_base& s, exy::storage_ref result)
+        static constexpr void* call(exy::future_base&, exy::state_base& s, exy::storage_ref result)
         {
             auto& self = static_cast<_state<F>&>(s);
 
@@ -177,10 +177,10 @@ inline constexpr struct test_run_t
     template <exy::future F>
     static constexpr test_result operator()(F&& f)
     {
-        _state<F> state(exy_mov(f));
+        _state<F> state(f);
 
         exy::storage<_storage_spec<F>()> result;
-        F::template op<_c<F>>::start(state, result);
+        F::template op<_c<F>>::start(f, state, result);
 
         state._done.wait(false, std::memory_order_acquire);
 

@@ -16,11 +16,13 @@ namespace
 {
 constexpr struct background_backend : exys::parallel_backend
 {
-    void schedule(job& j, exy::state_base& s, exy::storage_ref result) const override
+    void schedule(
+        job& j, exy::future_base& f, exy::state_base& s, exy::storage_ref result
+    ) const override
     {
         // For the test we don't really care whether it truly runs in the background, just as long
         // as it is a different thread.
-        std::jthread([&] { j.continuation(s, result); });
+        std::jthread([&] { j.continuation(f, s, result); });
     }
 } background_backend;
 
@@ -28,7 +30,7 @@ const struct failing_backend : exys::parallel_backend
 {
     std::exception_ptr ex = std::make_exception_ptr(0);
 
-    void schedule(job&, exy::state_base&, exy::storage_ref) const override
+    void schedule(job&, exy::future_base&, exy::state_base&, exy::storage_ref) const override
     {
         std::rethrow_exception(ex);
     }

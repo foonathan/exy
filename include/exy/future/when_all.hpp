@@ -35,12 +35,12 @@ struct _wall : exy::future_base
         std::atomic<exy::continuation>                       _error_continuation = nullptr;
         std::atomic<unsigned>                                _done               = 0;
 
-        constexpr explicit state(_wall&& self) noexcept(
-            (std::is_nothrow_constructible_v<exy::state_of<F>, F&&> && ...)
+        constexpr explicit state(_wall& self) noexcept(
+            (std::is_nothrow_constructible_v<exy::state_of<F>, F&> && ...)
         )
         : _base([&] {
-              auto [... f] = exy_mov(self)._base;
-              return decltype(_base)(exy_mov(f)...);
+              auto& [... f] = self._base;
+              return decltype(_base)(f...);
           }())
         {}
 
@@ -84,15 +84,18 @@ struct _wall : exy::future_base
         template <std::size_t Idx>
         struct _c : exy::adapter_continuation<_c<Idx>, Cont>
         {
+            static constexpr auto& get(exy::future_base& f, exy::state_base& s) noexcept
+            {
+                return std::get<Idx>(Cont::get(f, s)._base);
+            }
             static constexpr auto& get(exy::state_base& s) noexcept
             {
-                state& self = Cont::get(s);
-                return std::get<Idx>(self._base);
+                return std::get<Idx>(Cont::get(s)._base);
             }
 
             template <exy::signature_with_tag<exy::value_tag> S>
             static constexpr exy::continuation continuation_for(
-                exy::state_base& s, exy::storage_ref& result
+                exy::future_base&, exy::state_base& s, exy::storage_ref& result
             ) noexcept
             {
                 state& self = Cont::get(s);
@@ -101,7 +104,7 @@ struct _wall : exy::future_base
 
             template <typename S> // error or stopped
             static constexpr exy::continuation continuation_for(
-                exy::state_base& s, exy::storage_ref& result
+                exy::future_base&, exy::state_base& s, exy::storage_ref& result
             ) noexcept
             {
                 state& self = Cont::get(s);
@@ -120,12 +123,14 @@ struct _wall : exy::future_base
             }
         };
 
-        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
+        static constexpr void* start(
+            exy::future_base& f, exy::state_base& s, exy::storage_ref result
+        )
         {
             if constexpr (sizeof...(F) == 0)
             {
                 auto          cont = exy::set<signatures, Cont, _value_signature>(result);
-                EXY_TAIL_CALL cont(s, result);
+                EXY_TAIL_CALL cont(f, s, result);
             }
             else
             {
@@ -134,7 +139,7 @@ struct _wall : exy::future_base
 
                 return [&]<std::size_t... Idx>(std::index_sequence<Idx...>) {
                     auto& [... storage] = self._storage;
-                    return (F::template op<_c<Idx>>::start(s, exy::storage_ref(storage)), ...);
+                    return (F::template op<_c<Idx>>::start(f, s, exy::storage_ref(storage)), ...);
                 }(std::index_sequence_for<F...>{});
             }
         }

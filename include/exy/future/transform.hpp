@@ -41,13 +41,9 @@ struct _t : exy::future_base
     struct state : exy::state_base
     {
         EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _base;
-        EXY_NO_UNIQUE_ADDRESS Fn                  _fn;
 
-        constexpr explicit state(_t&& self) noexcept(
-            std::is_nothrow_constructible_v<exy::state_of<Base>, Base&&>
-            && std::is_nothrow_move_constructible_v<Fn>
-        )
-        : _base(exy_mov(self)._base), _fn(exy_mov(self)._fn)
+        constexpr explicit state(_t& self) noexcept(exy::has_nothrow_constructible_state<Base>)
+        : _base(self._base)
         {}
     };
 
@@ -61,6 +57,10 @@ struct _t : exy::future_base
     {
         struct _c : exy::adapter_continuation<_c, Cont>
         {
+            static constexpr Base& get(exy::future_base& f, exy::state_base& s) noexcept
+            {
+                return Cont::get(f, s)._base;
+            }
             static constexpr exy::state_of<Base>& get(exy::state_base& s) noexcept
             {
                 return Cont::get(s)._base;
@@ -68,10 +68,10 @@ struct _t : exy::future_base
 
             template <exy::signature_with_tag<TagFrom> S>
             static constexpr exy::continuation continuation_for(
-                exy::state_base& s, exy::storage_ref result
+                exy::future_base& f, exy::state_base& s, exy::storage_ref result
             ) noexcept
             {
-                state& self = Cont::get(s);
+                _t& self = Cont::get(f, s);
 
                 using transformed_type
                     = exy::signature_arguments_as<S, _::mp_bind_front<exy::invoke_result_t, Fn&&>>;
@@ -81,13 +81,13 @@ struct _t : exy::future_base
                     auto [... args] = result.get<S>();
                     if constexpr (std::is_void_v<transformed_type>)
                     {
-                        exy_invoke(exy_mov(self._fn), exy_fwd(args)...);
+                        exy_invoke(exy_mov(self)._fn, exy_fwd(args)...);
                         return exy::set<signatures, Cont, TagTo()>(result);
                     }
                     else
                     {
                         return exy::set<signatures, Cont, TagTo(transformed_type)>(
-                            result, exy_invoke(exy_mov(self._fn), exy_fwd(args)...)
+                            result, exy_invoke(exy_mov(self)._fn, exy_fwd(args)...)
                         );
                     }
                 }
@@ -98,9 +98,11 @@ struct _t : exy::future_base
             }
         };
 
-        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
+        static constexpr void* start(
+            exy::future_base& f, exy::state_base& s, exy::storage_ref result
+        )
         {
-            EXY_TAIL_CALL Base::template op<_c>::start(s, result);
+            EXY_TAIL_CALL Base::template op<_c>::start(f, s, result);
         }
     };
 };

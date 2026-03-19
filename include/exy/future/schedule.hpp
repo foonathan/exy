@@ -32,31 +32,27 @@ inline constexpr struct starts_on_t
     }
 } starts_on;
 
-template <typename Base, typename Sch>
+template <typename Base, typename SchF>
 struct _co : exy::future_base
 {
     EXY_NO_UNIQUE_ADDRESS Base _base;
-    EXY_NO_UNIQUE_ADDRESS Sch  _sch;
-
-    using _sch_future       = exy::future_for<Sch>;
-    using _sch_future_state = exy::state_of<_sch_future>;
+    EXY_NO_UNIQUE_ADDRESS SchF _sch;
 
     using signatures = _::mp_unique<_::mp_append<
-        exy::signatures_of<Base>,
-        _::mp_filter<exy::error_tag::is, exy::signatures_of<_sch_future>>>>;
+        exy::signatures_of<Base>, _::mp_filter<exy::error_tag::is, exy::signatures_of<SchF>>>>;
 
     struct state : exy::state_base
     {
-        EXY_NO_UNIQUE_ADDRESS exy::state_of<Base>                               _base;
-        std::variant<Sch, _sch_future_state>                                    _sch_or_sch_state;
-        exy::storage_ref                                                        _prev_result;
-        exy::storage<exy::storage_spec::get(exy::signatures_of<_sch_future>())> _sch_result;
+        EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _base;
+        EXY_NO_UNIQUE_ADDRESS exy::state_of<SchF>                        _sch;
+        exy::storage_ref                                                 _prev_result;
+        exy::storage<exy::storage_spec::get(exy::signatures_of<SchF>())> _sch_result;
 
-        constexpr explicit state(_co&& self) noexcept(
-            std::is_nothrow_constructible_v<exy::state_of<Base>, Base&&>
-            && std::is_nothrow_move_constructible_v<Sch>
+        constexpr explicit state(_co& self) noexcept(
+            std::is_nothrow_constructible_v<exy::state_of<Base>, Base&>
+            && std::is_nothrow_constructible_v<exy::state_of<SchF>, SchF&>
         )
-        : _base(exy_mov(self)._base), _sch_or_sch_state(exy_mov(self)._sch)
+        : _base(self._base), _sch(self._sch)
         {}
     };
 
@@ -72,23 +68,31 @@ struct _co : exy::future_base
         template <typename PrevS>
         struct _cpost
         {
-            static constexpr _sch_future_state& get(exy::state_base& s) noexcept
+            static constexpr SchF& get(exy::future_base& f, exy::state_base& s) noexcept
             {
-                return std::get<_sch_future_state>(Cont::get(s)._sch_or_sch_state);
+                return Cont::get(f, s)._sch;
+            }
+            static constexpr exy::state_of<SchF>& get(exy::state_base& s) noexcept
+            {
+                return Cont::get(s)._sch;
             }
 
             template <std::same_as<exy::value_tag()> S>
-            static constexpr void* call(exy::state_base& s, exy::storage_ref result)
+            static constexpr void* call(
+                exy::future_base& f, exy::state_base& s, exy::storage_ref result
+            )
             {
                 state& self = Cont::get(s);
 
                 // Continue with the correct result.
                 result = self._prev_result;
-                EXY_TAIL_CALL Cont::template call<PrevS>(s, result);
+                EXY_TAIL_CALL Cont::template call<PrevS>(f, s, result);
             }
 
             template <exy::signature_with_tag<exy::error_tag> S>
-            static constexpr void* call(exy::state_base& s, exy::storage_ref result)
+            static constexpr void* call(
+                exy::future_base& f, exy::state_base& s, exy::storage_ref result
+            )
             {
                 state& self = Cont::get(s);
 
@@ -101,12 +105,16 @@ struct _co : exy::future_base
                 }
 
                 result = self._prev_result;
-                EXY_TAIL_CALL Cont::template call<S>(s, result);
+                EXY_TAIL_CALL Cont::template call<S>(f, s, result);
             }
         };
 
         struct _cpre : exy::adapter_continuation<_cpre, Cont>
         {
+            static constexpr Base& get(exy::future_base& f, exy::state_base& s) noexcept
+            {
+                return Cont::get(f, s)._base;
+            }
             static constexpr exy::state_of<Base>& get(exy::state_base& s) noexcept
             {
                 return Cont::get(s)._base;
@@ -114,31 +122,25 @@ struct _co : exy::future_base
 
             template <exy::signature_with_tag<exy::value_tag> S>
             static constexpr exy::continuation continuation_for(
-                exy::state_base& s, exy::storage_ref& result
+                exy::future_base&, exy::state_base& s, exy::storage_ref& result
             ) noexcept
             {
                 state& self = Cont::get(s);
-
-                // Prepare the state for the schedule operation.
-                auto sch = std::get<Sch>(exy_mov(self)._sch_or_sch_state);
-                self._sch_or_sch_state.template emplace<_sch_future_state>(exy_mov(sch).schedule());
 
                 // Redirect the storage for the schedule operation.
                 self._prev_result = result;
                 result            = exy::storage_ref(self._sch_result);
 
                 // And continue with performing the schedule.
-                static constexpr auto sch_state_path
-                    = [](exy::state_base* s) -> _sch_future_state& {
-                    return std::get<_sch_future_state>(static_cast<state*>(s)->_sch_or_sch_state);
-                };
-                return &_sch_future::template op<_cpost<S>>::start;
+                return &SchF::template op<_cpost<S>>::start;
             }
         };
 
-        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
+        static constexpr void* start(
+            exy::future_base& f, exy::state_base& s, exy::storage_ref result
+        )
         {
-            EXY_TAIL_CALL Base::template op<_cpre>::start(s, result);
+            EXY_TAIL_CALL Base::template op<_cpre>::start(f, s, result);
         }
     };
 };
@@ -146,9 +148,9 @@ struct _co : exy::future_base
 inline constexpr struct continues_on_t
 {
     template <exy::future F, exy::scheduler Sch>
-    static constexpr auto operator()(F&& f, const Sch& sch) -> _co<F, Sch>
+    static constexpr auto operator()(F&& f, const Sch& sch) -> _co<F, exy::future_for<Sch>>
     {
-        return {{}, exy_mov(f), sch};
+        return {{}, exy_mov(f), sch.schedule()};
     }
 
     template <exy::scheduler Sch>

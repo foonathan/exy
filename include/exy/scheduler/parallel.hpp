@@ -20,7 +20,9 @@ public:
     };
 
     /// The job reference is valid until the continuation is called.
-    constexpr virtual void schedule(job& j, exy::state_base& s, exy::storage_ref result) const = 0;
+    constexpr virtual void schedule(
+        job& j, exy::future_base& f, exy::state_base& s, exy::storage_ref result
+    ) const = 0;
 
 protected:
     parallel_backend()          = default;
@@ -37,13 +39,9 @@ class parallel : public exy::scheduler_base
 
         struct state : exy::state_base
         {
-            union
-            {
-                const parallel_backend* _backend;
-                parallel_backend::job   _job;
-            };
+            parallel_backend::job _job;
 
-            constexpr explicit state(_f&& f) noexcept : _backend(f._backend) {}
+            constexpr state(_f&) noexcept : _job{.continuation = nullptr, .next = nullptr} {}
         };
 
         static consteval auto storage_spec() noexcept
@@ -54,19 +52,21 @@ class parallel : public exy::scheduler_base
         template <typename Cont>
         struct op
         {
-            static constexpr void* start(exy::state_base& s, exy::storage_ref result)
+            static constexpr void* start(
+                exy::future_base& f, exy::state_base& s, exy::storage_ref result
+            )
             {
-                state& self    = Cont::get(s);
-                auto   backend = self._backend;
+                _f&    self  = Cont::get(f, s);
+                state& state = Cont::get(s);
 
                 auto cont = [&] -> exy::continuation {
                     try
                     {
-                        self._job = {
+                        state._job = {
                             .next         = nullptr,
                             .continuation = exy::set<signatures, Cont, exy::value_tag()>(result),
                         };
-                        backend->schedule(self._job, s, result);
+                        self._backend->schedule(state._job, f, s, result);
                         return nullptr;
                     }
                     catch (...)
@@ -75,7 +75,7 @@ class parallel : public exy::scheduler_base
                     }
                 }();
                 if (cont)
-                    EXY_TAIL_CALL cont(s, result);
+                    EXY_TAIL_CALL cont(f, s, result);
                 else
                     return nullptr;
             }
