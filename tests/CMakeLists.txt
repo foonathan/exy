@@ -7,6 +7,7 @@ include(Catch)
 
 add_executable(exy_tests
     futures/and_then.cpp
+    futures/environment.cpp
     futures/factory.cpp
     futures/schedule.cpp
     futures/transform.cpp

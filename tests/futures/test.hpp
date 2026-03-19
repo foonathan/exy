@@ -10,6 +10,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_templated.hpp>
 #include <exy/support/future.hpp>
+#include <exy/support/query.hpp>
 
 struct test_result
 {
@@ -128,16 +129,15 @@ struct test_result_matcher : Catch::Matchers::MatcherGenericBase
 
 inline constexpr struct test_run_t
 {
-    template <typename F>
+    template <typename Env, typename F>
     struct _state : exy::state_base
     {
+        const Env&        _env;
         F&                _f;
         exy::state_of<F>  _s;
         std::atomic<bool> _done = false;
 
-        constexpr explicit _state(F& f) noexcept(exy::has_nothrow_constructible_state<F>)
-        : _f(f), _s(f)
-        {}
+        constexpr explicit _state(const Env& env, F& f) : _env(env), _f(f), _s(f) {}
     };
 
     template <typename F>
@@ -148,22 +148,27 @@ inline constexpr struct test_run_t
         );
     }
 
-    template <typename F>
+    template <typename Env, typename F>
     struct _c
     {
         static constexpr F& get_future(exy::state_base& s) noexcept
         {
-            return static_cast<_state<F>&>(s)._f;
+            return static_cast<_state<Env, F>&>(s)._f;
         }
         static constexpr exy::state_of<F>& get_state(exy::state_base& s) noexcept
         {
-            return static_cast<_state<F>&>(s)._s;
+            return static_cast<_state<Env, F>&>(s)._s;
+        }
+
+        static constexpr auto query(exy::query auto q, exy::state_base& s) noexcept
+        {
+            return static_cast<_state<Env, F>&>(s)._env.query(q);
         }
 
         template <typename S>
         static constexpr void* call(exy::state_base& s, exy::storage_ref result)
         {
-            auto& self = static_cast<_state<F>&>(s);
+            auto& self = static_cast<_state<Env, F>&>(s);
 
             auto [... args] = result.get<S>();
             result.emplace_raw<test_result>(
@@ -177,13 +182,13 @@ inline constexpr struct test_run_t
         }
     };
 
-    template <exy::future F>
-    static constexpr test_result operator()(F&& f)
+    template <typename Env, exy::future F>
+    static constexpr test_result operator()(const Env& env, F&& f)
     {
-        _state<F> state(f);
+        _state state(env, f);
 
         exy::storage<_storage_spec<F>()> result;
-        F::template op<_c<F>>::start(state, result);
+        F::template op<_c<Env, F>>::start(state, result);
 
         state._done.wait(false, std::memory_order_acquire);
 
@@ -191,8 +196,20 @@ inline constexpr struct test_run_t
     }
 } test_run;
 
+inline constexpr struct test_env_t
+{
+    test_env_t()                             = default;
+    test_env_t(const test_env_t&)            = delete;
+    test_env_t& operator=(const test_env_t&) = delete;
+
+    static constexpr auto query(exy::query auto) noexcept
+    {
+        return exy::no_such_query{};
+    }
+} test_env;
+
 #define REQUIRE_FUTURE(expr, ...)                                                                  \
-    REQUIRE_THAT(test_run(auto(expr)), test_result_matcher(__VA_ARGS__))
+    REQUIRE_THAT(test_run(test_env, auto(expr)), test_result_matcher(__VA_ARGS__))
 
 #define REQUIRE_SIGNATURES(expr, ...)                                                              \
     static_assert(std::same_as<exy::signatures_of<decltype(expr)>, exy::signatures<__VA_ARGS__>>)

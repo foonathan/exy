@@ -8,6 +8,7 @@
 #include <optional>
 #include <tuple>
 #include <exy/support/future.hpp>
+#include <exy/support/query.hpp>
 
 namespace exy
 {
@@ -47,6 +48,11 @@ inline constexpr struct sync_wait_t
         static constexpr exy::state_of<F>& get_state(exy::state_base& s) noexcept
         {
             return static_cast<_state<F>&>(s)._s;
+        }
+
+        static constexpr auto query(exy::query auto, exy::state_base&) noexcept
+        {
+            return exy::no_such_query{};
         }
 
         template <exy::signature_with_tag<exy::value_tag> S>

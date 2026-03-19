@@ -34,7 +34,7 @@ constexpr auto make_adaptor_proxy(exy::movable auto&&... args)
 namespace exy
 {
 template <typename Derived, typename Cont>
-struct adapter_continuation
+struct adapter_continuation : Cont
 {
     template <typename S>
         requires requires (exy::state_base& s, exy::storage_ref result) {

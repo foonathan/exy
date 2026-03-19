@@ -1,0 +1,47 @@
+// Copyright (C) 2026 Jonathan Müller and exy contributors
+// SPDX-License-Identifier: BSL-1.0
+
+#ifndef EXY_SUPPORT_QUERY_HPP_INCLUDED
+#define EXY_SUPPORT_QUERY_HPP_INCLUDED
+
+#include <exy/support/base.hpp>
+
+namespace exy
+{
+struct query_base
+{};
+
+template <typename T>
+concept query = std::derived_from<T, query_base>;
+template <typename T, typename Env>
+using query_result_t = decltype(std::declval<T>()(std::declval<Env>()));
+
+template <typename T>
+concept typed_query = query<T> && requires { typename T::result_type; };
+template <typed_query T>
+using typed_query_result_t = typename T::result_type;
+
+struct no_such_query
+{};
+
+template <typename T>
+concept _is_query_result = !std::same_as<T, no_such_query>;
+template <typename Env, typename Q, typename... Args>
+concept has_query = query<Q> && requires (Q q, Args&&... args) {
+    { Env::query(q, exy_fwd(args)...) } -> _is_query_result;
+};
+
+template <typename Env>
+constexpr auto query_or_default(query auto q, auto&&... args) noexcept
+{
+    if constexpr (has_query<Env, decltype(q), decltype(args)...>)
+        return Env::query(q, exy_fwd(args)...);
+    else if constexpr (requires { q.default_value(); })
+        return q.default_value();
+    else
+        static_assert(_::mp_error<decltype(q)>::value, "query not supported");
+}
+} // namespace exy
+
+#endif // EXY_SUPPORT_QUERY_HPP_INCLUDED
+
