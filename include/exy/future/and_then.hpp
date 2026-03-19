@@ -71,17 +71,31 @@ struct _at : exy::future_base
         return result;
     }
 
-    template <typename Cont, auto... Path>
+    template <typename Cont>
     struct op
     {
-        struct _c : exy::adapter_continuation<_c, Cont>
+        template <typename Inner>
+        struct _ci : Cont
         {
+            static constexpr exy::state_of<Inner>& get(exy::state_base& s) noexcept
+            {
+                return std::get<exy::state_of<Inner>>(Cont::get(s)._sub_state);
+            }
+        };
+
+        struct _cb : exy::adapter_continuation<_cb, Cont>
+        {
+            static constexpr exy::state_of<Base>& get(exy::state_base& s) noexcept
+            {
+                return std::get<exy::state_of<Base>>(Cont::get(s)._sub_state);
+            }
+
             template <exy::signature_with_tag<Tag> S>
             static constexpr exy::continuation continuation_for(
-                exy::state_ref s, exy::storage_ref result
+                exy::state_base& s, exy::storage_ref result
             ) noexcept
             {
-                state& self = s.get<Path...>();
+                state& self = Cont::get(s);
 
                 try
                 {
@@ -92,10 +106,7 @@ struct _at : exy::future_base
 
                     self._sub_state.template emplace<inner_state_t>(exy_mov(inner));
 
-                    static constexpr auto inner_path = [](exy::state_base* s) -> inner_state_t& {
-                        return std::get<inner_state_t>(static_cast<state*>(s)->_sub_state);
-                    };
-                    return &inner_t::template op<Cont, Path..., inner_path>::start;
+                    return &inner_t::template op<_ci<inner_t>>::start;
                 }
                 catch (...)
                 {
@@ -104,13 +115,9 @@ struct _at : exy::future_base
             }
         };
 
-        static constexpr void* start(exy::state_ref s, exy::storage_ref result)
+        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
         {
-            static constexpr auto base_path = [](exy::state_base* s) -> auto& {
-                return std::get<exy::state_of<Base>>(static_cast<state*>(s)->_sub_state);
-            };
-            EXY_TAIL_CALL
-            Base::template op<_c, Path..., base_path>::start(s, result);
+            EXY_TAIL_CALL Base::template op<_cb>::start(s, result);
         }
     };
 };

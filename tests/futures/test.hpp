@@ -152,10 +152,15 @@ inline constexpr struct test_run_t
     template <typename F>
     struct _c
     {
-        template <typename S>
-        static constexpr void* call(exy::state_ref s, exy::storage_ref result)
+        static constexpr exy::state_of<F>& get(exy::state_base& s) noexcept
         {
-            auto& self = s.get_root<_state<F>>();
+            return static_cast<_state<F>&>(s)._s;
+        }
+
+        template <typename S>
+        static constexpr void* call(exy::state_base& s, exy::storage_ref result)
+        {
+            auto& self = static_cast<_state<F>&>(s);
 
             auto [... args] = result.get<S>();
             result.emplace_raw<test_result>(
@@ -175,7 +180,7 @@ inline constexpr struct test_run_t
         _state<F> state(exy_mov(f));
 
         exy::storage<_storage_spec<F>()> result;
-        F::template op<_c<F>, &_state<F>::_s>::start(state, result);
+        F::template op<_c<F>>::start(state, result);
 
         state._done.wait(false, std::memory_order_acquire);
 

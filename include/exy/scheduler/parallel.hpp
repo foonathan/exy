@@ -20,7 +20,7 @@ public:
     };
 
     /// The job reference is valid until the continuation is called.
-    constexpr virtual void schedule(job& j, exy::state_ref s, exy::storage_ref result) const = 0;
+    constexpr virtual void schedule(job& j, exy::state_base& s, exy::storage_ref result) const = 0;
 
 protected:
     parallel_backend()          = default;
@@ -51,12 +51,12 @@ class parallel : public exy::scheduler_base
             return exy::storage_spec::get(signatures());
         }
 
-        template <typename Cont, auto... Path>
+        template <typename Cont>
         struct op
         {
-            static constexpr void* start(exy::state_ref s, exy::storage_ref result)
+            static constexpr void* start(exy::state_base& s, exy::storage_ref result)
             {
-                state& self    = s.get<Path...>();
+                state& self    = Cont::get(s);
                 auto   backend = self._backend;
 
                 auto cont = [&] -> exy::continuation {

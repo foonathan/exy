@@ -7,7 +7,6 @@
 // IWYU pragma: begin_exports
 #include <exy/support/base.hpp>
 #include <exy/support/signature.hpp>
-#include <exy/support/state.hpp>
 #include <exy/support/storage.hpp>
 // IWYU pragma: end_exports
 
@@ -23,10 +22,14 @@ using is_future = std::bool_constant<future<T>>;
 
 template <typename F>
 using signatures_of = typename F::signatures;
+
+struct state_base
+{};
+
 template <typename F>
 using state_of = typename F::state;
 
-using continuation = void* (*)(exy::state_ref, exy::storage_ref);
+using continuation = void* (*)(exy::state_base&, exy::storage_ref);
 
 template <typename Signatures, typename Cont, typename S>
 constexpr auto set(exy::storage_ref result, auto&&... args) -> continuation

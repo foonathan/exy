@@ -78,26 +78,33 @@ struct _wall : exy::future_base
         return exy::storage_spec::get(signatures());
     }
 
-    template <typename Cont, auto... Path>
+    template <typename Cont>
     struct op
     {
-        struct _c : exy::adapter_continuation<_c, Cont>
+        template <std::size_t Idx>
+        struct _c : exy::adapter_continuation<_c<Idx>, Cont>
         {
+            static constexpr auto& get(exy::state_base& s) noexcept
+            {
+                state& self = Cont::get(s);
+                return std::get<Idx>(self._base);
+            }
+
             template <exy::signature_with_tag<exy::value_tag> S>
             static constexpr exy::continuation continuation_for(
-                exy::state_ref s, exy::storage_ref& result
+                exy::state_base& s, exy::storage_ref& result
             ) noexcept
             {
-                state& self = s.get<Path...>();
+                state& self = Cont::get(s);
                 return self.template complete<Cont>(result);
             }
 
             template <typename S> // error or stopped
             static constexpr exy::continuation continuation_for(
-                exy::state_ref s, exy::storage_ref& result
+                exy::state_base& s, exy::storage_ref& result
             ) noexcept
             {
-                state& self = s.get<Path...>();
+                state& self = Cont::get(s);
 
                 if (self._error_continuation.exchange(
                         &Cont::template call<S>, std::memory_order_relaxed
@@ -113,16 +120,7 @@ struct _wall : exy::future_base
             }
         };
 
-        template <std::size_t Idx>
-        static consteval auto _path_for() noexcept
-        {
-            return [](state_base* s) -> auto& {
-                state& self = *static_cast<state*>(s);
-                return std::get<Idx>(self._base);
-            };
-        }
-
-        static constexpr void* start(exy::state_ref s, exy::storage_ref result)
+        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
         {
             if constexpr (sizeof...(F) == 0)
             {
@@ -131,17 +129,12 @@ struct _wall : exy::future_base
             }
             else
             {
-                state& self  = s.get<Path...>();
+                state& self  = Cont::get(s);
                 self._result = result;
 
                 return [&]<std::size_t... Idx>(std::index_sequence<Idx...>) {
                     auto& [... storage] = self._storage;
-                    return (
-                        F::template op<_c, Path..., _path_for<Idx>()>::start(
-                            s, exy::storage_ref(storage)
-                        ),
-                        ...
-                    );
+                    return (F::template op<_c<Idx>>::start(s, exy::storage_ref(storage)), ...);
                 }(std::index_sequence_for<F...>{});
             }
         }

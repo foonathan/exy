@@ -56,17 +56,22 @@ struct _t : exy::future_base
         return exy::max(Base::storage_spec(), exy::storage_spec::get(signatures()));
     }
 
-    template <typename Cont, auto... Path>
+    template <typename Cont>
     struct op
     {
         struct _c : exy::adapter_continuation<_c, Cont>
         {
+            static constexpr exy::state_of<Base>& get(exy::state_base& s) noexcept
+            {
+                return Cont::get(s)._base;
+            }
+
             template <exy::signature_with_tag<TagFrom> S>
             static constexpr exy::continuation continuation_for(
-                exy::state_ref s, exy::storage_ref result
+                exy::state_base& s, exy::storage_ref result
             ) noexcept
             {
-                state& self = s.get<Path...>();
+                state& self = Cont::get(s);
 
                 using transformed_type
                     = exy::signature_arguments_as<S, _::mp_bind_front<exy::invoke_result_t, Fn&&>>;
@@ -93,9 +98,9 @@ struct _t : exy::future_base
             }
         };
 
-        static constexpr void* start(exy::state_ref s, exy::storage_ref result)
+        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
         {
-            EXY_TAIL_CALL Base::template op<_c, Path..., &state::_base>::start(s, result);
+            EXY_TAIL_CALL Base::template op<_c>::start(s, result);
         }
     };
 };

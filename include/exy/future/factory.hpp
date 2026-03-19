@@ -32,12 +32,12 @@ struct _f : exy::future_base
         return exy::storage_spec::get(signatures());
     }
 
-    template <typename Cont, auto... Path>
+    template <typename Cont>
     struct op
     {
-        static constexpr void* start(exy::state_ref s, exy::storage_ref result)
+        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
         {
-            state& self = s.get<Path...>();
+            state& self = Cont::get(s);
 
             auto cont = [&] {
                 try

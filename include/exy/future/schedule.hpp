@@ -66,16 +66,21 @@ struct _co : exy::future_base
         return exy::max(Base::storage_spec(), exy::storage_spec::get(signatures()));
     }
 
-    template <typename Cont, auto... Path>
+    template <typename Cont>
     struct op
     {
         template <typename PrevS>
         struct _cpost
         {
-            template <std::same_as<exy::value_tag()> S>
-            static constexpr void* call(exy::state_ref s, exy::storage_ref result)
+            static constexpr _sch_future_state& get(exy::state_base& s) noexcept
             {
-                state& self = s.get<Path...>();
+                return std::get<_sch_future_state>(Cont::get(s)._sch_or_sch_state);
+            }
+
+            template <std::same_as<exy::value_tag()> S>
+            static constexpr void* call(exy::state_base& s, exy::storage_ref result)
+            {
+                state& self = Cont::get(s);
 
                 // Continue with the correct result.
                 result = self._prev_result;
@@ -83,9 +88,9 @@ struct _co : exy::future_base
             }
 
             template <exy::signature_with_tag<exy::error_tag> S>
-            static constexpr void* call(exy::state_ref s, exy::storage_ref result)
+            static constexpr void* call(exy::state_base& s, exy::storage_ref result)
             {
-                state& self = s.get<Path...>();
+                state& self = Cont::get(s);
 
                 // Scheduling failed, destroy the previous result, and continue with the error.
                 {
@@ -102,12 +107,17 @@ struct _co : exy::future_base
 
         struct _cpre : exy::adapter_continuation<_cpre, Cont>
         {
+            static constexpr exy::state_of<Base>& get(exy::state_base& s) noexcept
+            {
+                return Cont::get(s)._base;
+            }
+
             template <exy::signature_with_tag<exy::value_tag> S>
             static constexpr exy::continuation continuation_for(
-                exy::state_ref s, exy::storage_ref& result
+                exy::state_base& s, exy::storage_ref& result
             ) noexcept
             {
-                state& self = s.get<Path...>();
+                state& self = Cont::get(s);
 
                 // Prepare the state for the schedule operation.
                 auto sch = std::get<Sch>(exy_mov(self)._sch_or_sch_state);
@@ -122,13 +132,13 @@ struct _co : exy::future_base
                     = [](exy::state_base* s) -> _sch_future_state& {
                     return std::get<_sch_future_state>(static_cast<state*>(s)->_sch_or_sch_state);
                 };
-                return &_sch_future::template op<_cpost<S>, Path..., sch_state_path>::start;
+                return &_sch_future::template op<_cpost<S>>::start;
             }
         };
 
-        static constexpr void* start(exy::state_ref s, exy::storage_ref result)
+        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
         {
-            EXY_TAIL_CALL Base::template op<_cpre, Path..., &state::_base>::start(s, result);
+            EXY_TAIL_CALL Base::template op<_cpre>::start(s, result);
         }
     };
 };
