@@ -40,7 +40,7 @@ struct _wall : exy::future_base
         )
         : _base([&] {
               auto [... f] = exy_mov(self)._base;
-              return exy::make_pack(exy::state_of<F>(exy_mov(f))...);
+              return decltype(_base)(exy_mov(f)...);
           }())
         {}
 

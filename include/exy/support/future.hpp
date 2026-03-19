@@ -22,12 +22,16 @@ using is_future = std::bool_constant<future<T>>;
 
 template <typename F>
 using signatures_of = typename F::signatures;
-
-struct state_base
-{};
-
 template <typename F>
 using state_of = typename F::state;
+
+struct state_base
+{
+    state_base()                             = default;
+    state_base(const state_base&)            = delete;
+    state_base& operator=(const state_base&) = delete;
+    ~state_base()                            = default;
+};
 
 using continuation = void* (*)(exy::state_base&, exy::storage_ref);
 
