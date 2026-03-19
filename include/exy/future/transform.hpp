@@ -57,21 +57,21 @@ struct _t : exy::future_base
     {
         struct _c : exy::adapter_continuation<_c, Cont>
         {
-            static constexpr Base& get(exy::future_base& f, exy::state_base& s) noexcept
+            static constexpr Base& get_future(exy::state_base& s) noexcept
             {
-                return Cont::get(f, s)._base;
+                return Cont::get_future(s)._base;
             }
-            static constexpr exy::state_of<Base>& get(exy::state_base& s) noexcept
+            static constexpr exy::state_of<Base>& get_state(exy::state_base& s) noexcept
             {
-                return Cont::get(s)._base;
+                return Cont::get_state(s)._base;
             }
 
             template <exy::signature_with_tag<TagFrom> S>
             static constexpr exy::continuation continuation_for(
-                exy::future_base& f, exy::state_base& s, exy::storage_ref result
+                exy::state_base& s, exy::storage_ref result
             ) noexcept
             {
-                _t& self = Cont::get(f, s);
+                _t& self = Cont::get_future(s);
 
                 using transformed_type
                     = exy::signature_arguments_as<S, _::mp_bind_front<exy::invoke_result_t, Fn&&>>;
@@ -98,11 +98,9 @@ struct _t : exy::future_base
             }
         };
 
-        static constexpr void* start(
-            exy::future_base& f, exy::state_base& s, exy::storage_ref result
-        )
+        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
         {
-            EXY_TAIL_CALL Base::template op<_c>::start(f, s, result);
+            EXY_TAIL_CALL Base::template op<_c>::start(s, result);
         }
     };
 };

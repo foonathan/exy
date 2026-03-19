@@ -41,7 +41,7 @@ struct state_base
     ~state_base()                            = default;
 };
 
-using continuation = void* (*)(exy::future_base&, exy::state_base&, exy::storage_ref);
+using continuation = void* (*)(exy::state_base&, exy::storage_ref);
 
 template <typename Signatures, typename Cont, typename S>
 constexpr auto set(exy::storage_ref result, auto&&... args) -> continuation

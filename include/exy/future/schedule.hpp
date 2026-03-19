@@ -68,33 +68,29 @@ struct _co : exy::future_base
         template <typename PrevS>
         struct _cpost
         {
-            static constexpr SchF& get(exy::future_base& f, exy::state_base& s) noexcept
+            static constexpr SchF& get_future(exy::state_base& s) noexcept
             {
-                return Cont::get(f, s)._sch;
+                return Cont::get_future(s)._sch;
             }
-            static constexpr exy::state_of<SchF>& get(exy::state_base& s) noexcept
+            static constexpr exy::state_of<SchF>& get_state(exy::state_base& s) noexcept
             {
-                return Cont::get(s)._sch;
+                return Cont::get_state(s)._sch;
             }
 
             template <std::same_as<exy::value_tag()> S>
-            static constexpr void* call(
-                exy::future_base& f, exy::state_base& s, exy::storage_ref result
-            )
+            static constexpr void* call(exy::state_base& s, exy::storage_ref result)
             {
-                state& self = Cont::get(s);
+                state& self = Cont::get_state(s);
 
                 // Continue with the correct result.
                 result = self._prev_result;
-                EXY_TAIL_CALL Cont::template call<PrevS>(f, s, result);
+                EXY_TAIL_CALL Cont::template call<PrevS>(s, result);
             }
 
             template <exy::signature_with_tag<exy::error_tag> S>
-            static constexpr void* call(
-                exy::future_base& f, exy::state_base& s, exy::storage_ref result
-            )
+            static constexpr void* call(exy::state_base& s, exy::storage_ref result)
             {
-                state& self = Cont::get(s);
+                state& self = Cont::get_state(s);
 
                 // Scheduling failed, destroy the previous result, and continue with the error.
                 {
@@ -105,27 +101,27 @@ struct _co : exy::future_base
                 }
 
                 result = self._prev_result;
-                EXY_TAIL_CALL Cont::template call<S>(f, s, result);
+                EXY_TAIL_CALL Cont::template call<S>(s, result);
             }
         };
 
         struct _cpre : exy::adapter_continuation<_cpre, Cont>
         {
-            static constexpr Base& get(exy::future_base& f, exy::state_base& s) noexcept
+            static constexpr Base& get_future(exy::state_base& s) noexcept
             {
-                return Cont::get(f, s)._base;
+                return Cont::get_future(s)._base;
             }
-            static constexpr exy::state_of<Base>& get(exy::state_base& s) noexcept
+            static constexpr exy::state_of<Base>& get_state(exy::state_base& s) noexcept
             {
-                return Cont::get(s)._base;
+                return Cont::get_state(s)._base;
             }
 
             template <exy::signature_with_tag<exy::value_tag> S>
             static constexpr exy::continuation continuation_for(
-                exy::future_base&, exy::state_base& s, exy::storage_ref& result
+                exy::state_base& s, exy::storage_ref& result
             ) noexcept
             {
-                state& self = Cont::get(s);
+                state& self = Cont::get_state(s);
 
                 // Redirect the storage for the schedule operation.
                 self._prev_result = result;
@@ -136,11 +132,9 @@ struct _co : exy::future_base
             }
         };
 
-        static constexpr void* start(
-            exy::future_base& f, exy::state_base& s, exy::storage_ref result
-        )
+        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
         {
-            EXY_TAIL_CALL Base::template op<_cpre>::start(f, s, result);
+            EXY_TAIL_CALL Base::template op<_cpre>::start(s, result);
         }
     };
 };

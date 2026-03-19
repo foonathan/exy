@@ -75,34 +75,34 @@ struct _at : exy::future_base
         template <typename Sub>
         struct _cs : Cont
         {
-            static constexpr Sub& get(exy::future_base&, exy::state_base& s) noexcept
+            static constexpr Sub& get_future(exy::state_base& s) noexcept
             {
-                return std::get<Sub>(Cont::get(s)._sub_future);
+                return std::get<Sub>(Cont::get_state(s)._sub_future);
             }
-            static constexpr exy::state_of<Sub>& get(exy::state_base& s) noexcept
+            static constexpr exy::state_of<Sub>& get_state(exy::state_base& s) noexcept
             {
-                return std::get<exy::state_of<Sub>>(Cont::get(s)._sub_state);
+                return std::get<exy::state_of<Sub>>(Cont::get_state(s)._sub_state);
             }
         };
 
         struct _cb : exy::adapter_continuation<_cb, Cont>
         {
-            static constexpr Base& get(exy::future_base& f, exy::state_base& s) noexcept
+            static constexpr Base& get_future(exy::state_base& s) noexcept
             {
-                return Cont::get(f, s)._base;
+                return Cont::get_future(s)._base;
             }
-            static constexpr exy::state_of<Base>& get(exy::state_base& s) noexcept
+            static constexpr exy::state_of<Base>& get_state(exy::state_base& s) noexcept
             {
-                return std::get<exy::state_of<Base>>(Cont::get(s)._sub_state);
+                return std::get<exy::state_of<Base>>(Cont::get_state(s)._sub_state);
             }
 
             template <exy::signature_with_tag<Tag> S>
             static constexpr exy::continuation continuation_for(
-                exy::future_base& f, exy::state_base& s, exy::storage_ref result
+                exy::state_base& s, exy::storage_ref result
             ) noexcept
             {
-                _at&   self  = Cont::get(f, s);
-                state& state = Cont::get(s);
+                _at&   self  = Cont::get_future(s);
+                state& state = Cont::get_state(s);
 
                 try
                 {
@@ -123,11 +123,9 @@ struct _at : exy::future_base
             }
         };
 
-        static constexpr void* start(
-            exy::future_base& f, exy::state_base& s, exy::storage_ref result
-        )
+        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
         {
-            EXY_TAIL_CALL Base::template op<_cb>::start(f, s, result);
+            EXY_TAIL_CALL Base::template op<_cb>::start(s, result);
         }
     };
 };

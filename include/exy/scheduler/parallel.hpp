@@ -20,9 +20,7 @@ public:
     };
 
     /// The job reference is valid until the continuation is called.
-    constexpr virtual void schedule(
-        job& j, exy::future_base& f, exy::state_base& s, exy::storage_ref result
-    ) const = 0;
+    constexpr virtual void schedule(job& j, exy::state_base& s, exy::storage_ref result) const = 0;
 
 protected:
     parallel_backend()          = default;
@@ -52,12 +50,10 @@ class parallel : public exy::scheduler_base
         template <typename Cont>
         struct op
         {
-            static constexpr void* start(
-                exy::future_base& f, exy::state_base& s, exy::storage_ref result
-            )
+            static constexpr void* start(exy::state_base& s, exy::storage_ref result)
             {
-                _f&    self  = Cont::get(f, s);
-                state& state = Cont::get(s);
+                _f&    self  = Cont::get_future(s);
+                state& state = Cont::get_state(s);
 
                 auto cont = [&] -> exy::continuation {
                     try
@@ -66,7 +62,7 @@ class parallel : public exy::scheduler_base
                             .next         = nullptr,
                             .continuation = exy::set<signatures, Cont, exy::value_tag()>(result),
                         };
-                        self._backend->schedule(state._job, f, s, result);
+                        self._backend->schedule(state._job, s, result);
                         return nullptr;
                     }
                     catch (...)
@@ -75,7 +71,7 @@ class parallel : public exy::scheduler_base
                     }
                 }();
                 if (cont)
-                    EXY_TAIL_CALL cont(f, s, result);
+                    EXY_TAIL_CALL cont(s, result);
                 else
                     return nullptr;
             }
