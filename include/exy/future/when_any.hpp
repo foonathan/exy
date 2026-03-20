@@ -122,8 +122,14 @@ struct _wany : exy::future_base
 
 inline constexpr struct when_any_t
 {
+    template <exy::future F>
+    static constexpr F&& operator()(F&& f)
+    {
+        return exy_mov(f);
+    }
+
     template <exy::future... F>
-        requires (sizeof...(F) > 0)
+        requires (sizeof...(F) > 1)
     static constexpr _wany<F...> operator()(F&&... f)
     {
         return {{}, exy::make_pack(exy_mov(f)...)};

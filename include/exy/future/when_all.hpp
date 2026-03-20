@@ -163,6 +163,13 @@ struct _wall : exy::future_base
 
 inline constexpr struct when_all_t
 {
+    template <exy::future F>
+        requires exy::single_value_signatures<exy::signatures_of<F>>
+    static constexpr F&& operator()(F&& f)
+    {
+        return exy_mov(f);
+    }
+
     template <exy::future... F>
         requires (exy::single_value_signatures<exy::signatures_of<F>> && ...)
     static constexpr _wall<F...> operator()(F&&... f)
