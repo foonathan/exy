@@ -48,16 +48,8 @@ struct _re : exy::future_base
     };
 };
 
-inline constexpr struct read_env_t
-{
-    static constexpr auto operator()(exy::typed_query auto q) noexcept -> _re<decltype(q)>
-    {
-        return {{}, q};
-    }
-} read_env;
-
 template <typename T, typename Fn, bool NoexceptFn, typename... Q>
-struct _we : exy::future_base
+struct _ref : exy::future_base
 {
     EXY_NO_UNIQUE_ADDRESS exy::pack<Q...> _q;
     EXY_NO_UNIQUE_ADDRESS Fn              _fn;
@@ -77,8 +69,8 @@ struct _we : exy::future_base
     {
         static constexpr void* start(exy::state_base& s, exy::storage_ref result)
         {
-            _we& self = Cont::get_future(s);
-            auto cont = [&] {
+            _ref& self = Cont::get_future(s);
+            auto  cont = [&] {
                 try
                 {
                     auto [... q] = self._q;
@@ -96,20 +88,18 @@ struct _we : exy::future_base
     };
 };
 
-template <typename T, bool NoexceptFn = false>
-struct with_env_t
+constexpr auto read_env(exy::typed_query auto q) noexcept -> _re<decltype(q)>
 {
-    template <typename Fn, exy::query... Q>
-    static constexpr auto operator()(Fn&& fn, Q... q) noexcept(
-        std::is_nothrow_move_constructible_v<Fn>
-    ) -> _we<T, std::decay_t<Fn>, NoexceptFn, Q...>
-    {
-        return {{}, exy::make_pack(q...), exy_fwd(fn)};
-    }
-};
+    return {{}, q};
+}
 
-template <typename T, bool NoexceptFn = false>
-inline constexpr with_env_t<T, NoexceptFn> with_env;
+template <typename T, bool NoexceptFn = false, exy::movable Fn, exy::query... Q>
+    requires (!exy::query<std::decay_t<Fn>>) && (sizeof...(Q) > 0)
+constexpr auto read_env(Fn&& fn, Q... q) noexcept(std::is_nothrow_move_constructible_v<Fn>)
+    -> _ref<T, std::decay_t<Fn>, NoexceptFn, Q...>
+{
+    return {{}, exy::make_pack(q...), exy_fwd(fn)};
+}
 } // namespace exy::futures
 
 #endif // EXY_FUTURE_ENVIRONMENT_HPP_INCLUDED
