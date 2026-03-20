@@ -13,6 +13,7 @@ add_executable(exy_tests
     futures/stop_point.cpp
     futures/transform.cpp
     futures/when_all.cpp
+    futures/when_any.cpp
     futures/with.cpp
 )
 target_link_libraries(exy_tests PRIVATE exy_dev Catch2::Catch2WithMain)

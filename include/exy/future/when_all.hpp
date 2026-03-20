@@ -5,7 +5,6 @@
 #define EXY_FUTURE_WHEN_ALL_HPP_INCLUDED
 
 #include <atomic>
-#include <tuple>
 #include <exy/query/stop.hpp>
 #include <exy/support/adapter.hpp>
 
@@ -37,7 +36,7 @@ struct _wall : exy::future_base
         std::atomic<unsigned>                                _done               = 0;
 
         constexpr explicit state(_wall& self) noexcept(
-            (std::is_nothrow_constructible_v<exy::state_of<F>, F&> && ...)
+            (exy::has_nothrow_constructible_state<F> && ...)
         )
         : _base([&] {
               auto& [... f] = self._base;
