@@ -31,6 +31,13 @@ TEST_CASE("when_any", "[futures]")
     REQUIRE_SIGNATURES(stop_value, exy::value_tag(int), exy::value_tag(), exy::stopped_tag());
     REQUIRE_FUTURE(stop_value, exy::value_tag(), 0);
 
+    auto throwing_move = exyf::when_any(exyf::value(0), exyf::value(move_only(1)));
+    REQUIRE_SIGNATURES(
+        throwing_move, exy::value_tag(int), exy::value_tag(move_only),
+        exy::error_tag(std::exception_ptr)
+    );
+    REQUIRE_FUTURE(exy_mov(throwing_move), exy::value_tag(), 0);
+
     auto stop_on_error = exyf::when_any(
         exyf::error(0),
         exyf::value() | exyf::stop_point | exyf::transform([]() noexcept { FAIL("unreachable"); })

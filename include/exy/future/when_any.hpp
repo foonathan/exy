@@ -15,7 +15,13 @@ struct _wany : exy::future_base
 {
     EXY_NO_UNIQUE_ADDRESS exy::pack<F...> _base;
 
-    using signatures = _::mp_unique<_::mp_append<exy::signatures_of<F>...>>;
+    using _combined_signatures = _::mp_unique<_::mp_append<exy::signatures_of<F>...>>;
+    using signatures           = exy::signatures_insert_exception<
+        _combined_signatures,
+        // All values have to be nothrow move constructible.
+        exy::signatures_all_of_tag<
+            _combined_signatures, exy::any_tag,
+            _::mp_compose<exy::pack, std::is_nothrow_move_constructible>>>;
 
     struct state : exy::state_base
     {

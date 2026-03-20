@@ -61,6 +61,12 @@ struct stopped_tag
     template <typename T>
     using is = std::bool_constant<signature_with_tag<T, stopped_tag>>;
 };
+
+struct any_tag
+{
+    template <typename T>
+    using is = _::mp_true;
+};
 } // namespace exy
 
 namespace exy
