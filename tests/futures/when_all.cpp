@@ -4,6 +4,8 @@
 #include <exy/future/when_all.hpp>
 
 #include <exy/future/factory.hpp>
+#include <exy/future/stop_point.hpp>
+#include <exy/future/transform.hpp>
 #include "test.hpp"
 
 namespace exyf = exy::futures;
@@ -51,5 +53,19 @@ TEST_CASE("when_all", "[futures]")
         throwing_move, exy::error_tag(std::exception_ptr), exy::value_tag(int, move_only)
     );
     REQUIRE_FUTURE(exy_mov(throwing_move), exy::value_tag(), 0, move_only(1));
+
+    auto stop_on_error = exyf::when_all(
+        exyf::value(), with_signature<exy::value_tag()>(exyf::error(11)),
+        exyf::value() | exyf::stop_point | exyf::transform([]() noexcept { FAIL("unreachable"); })
+    );
+    REQUIRE_SIGNATURES(stop_on_error, exy::error_tag(int), exy::stopped_tag(), exy::value_tag());
+    REQUIRE_FUTURE(stop_on_error, exy::error_tag(), 11);
+
+    auto stop_on_stop = exyf::when_all(
+        exyf::value(), with_signature<exy::value_tag()>(exyf::stopped(11)),
+        exyf::value() | exyf::stop_point | exyf::transform([]() noexcept { FAIL("unreachable"); })
+    );
+    REQUIRE_SIGNATURES(stop_on_stop, exy::stopped_tag(int), exy::stopped_tag(), exy::value_tag());
+    REQUIRE_FUTURE(stop_on_stop, exy::stopped_tag(), 11);
 }
 

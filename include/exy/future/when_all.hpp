@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <tuple>
+#include <exy/query/stop.hpp>
 #include <exy/support/adapter.hpp>
 
 namespace exy::futures
@@ -93,6 +94,22 @@ struct _wall : exy::future_base
                 return std::get<Idx>(Cont::get_state(s)._base);
             }
 
+            static constexpr bool override_query(
+                exy::queries::stop_requested_t q, exy::state_base& s
+            )
+            {
+                auto& self = Cont::get_state(s);
+                if (self._error_continuation.load(std::memory_order_relaxed) != nullptr)
+                    return true;
+
+                if constexpr (
+                    exy::has_query<Cont, exy::queries::stop_requested_t, exy::state_base&>
+                )
+                    EXY_TAIL_CALL Cont::query(q, s);
+                else
+                    return false;
+            }
+
             template <exy::signature_with_tag<exy::value_tag> S>
             static constexpr exy::continuation continuation_for(
                 exy::state_base& s, exy::storage_ref& result
@@ -109,10 +126,11 @@ struct _wall : exy::future_base
             {
                 state& self = Cont::get_state(s);
 
-                if (self._error_continuation.exchange(
-                        &Cont::template call<S>, std::memory_order_relaxed
-                    )
-                    == nullptr)
+                exy::continuation expected = nullptr;
+                if (self._error_continuation.compare_exchange_strong(
+                        expected, &Cont::template call<S>, std::memory_order_relaxed,
+                        std::memory_order_relaxed
+                    ))
                 {
                     // We are the first failure, properly set it.
                     auto [... args] = result.get<S>();
