@@ -5,14 +5,17 @@
 #define EXY_SUPPORT_ADAPTER_HPP_INCLUDED
 
 #include <exy/support/future.hpp> // IWYU pragma: export
+#include <exy/support/query.hpp>  // IWYU pragma: export
 
 namespace exy
 {
 struct adapter
 {
-    friend constexpr auto operator|(exy::future auto&& lhs, std::derived_from<adapter> auto&& self)
+    template <exy::future F, typename Self>
+        requires std::derived_from<std::decay_t<Self>, adapter>
+    friend constexpr auto operator|(F&& lhs, Self&& self)
     {
-        return exy_fwd(self)(exy_fwd(lhs));
+        return exy_fwd(self)(exy_mov(lhs));
     }
 };
 
@@ -34,28 +37,31 @@ constexpr auto make_adaptor_proxy(exy::movable auto&&... args)
 namespace exy
 {
 template <typename Derived, typename Cont>
-struct adapter_continuation : Cont
+struct adapter_continuation
 {
-    template <typename S>
-        requires requires (exy::state_base& s, exy::storage_ref result) {
-            Derived::template continuation_for<S>(s, result);
-        }
-    static constexpr void* call(exy::state_base& s, exy::storage_ref result)
+    static constexpr auto query(exy::query auto q, exy::state_base& s)
     {
-        auto cont = Derived::template continuation_for<S>(s, result);
-        if (cont)
-            EXY_TAIL_CALL cont(s, result);
+        if constexpr (requires { Derived::override_query(q, s); })
+            EXY_TAIL_CALL Derived::override_query(q, s);
         else
-            return nullptr;
+            EXY_TAIL_CALL Cont::query(q, s);
     }
 
     template <typename S>
-        requires (!requires (exy::state_base& s, exy::storage_ref result) {
-            Derived::template continuation_for<S>(s, result);
-        })
     static constexpr void* call(exy::state_base& s, exy::storage_ref result)
     {
-        EXY_TAIL_CALL Cont::template call<S>(s, result);
+        if constexpr (requires { Derived::template continuation_for<S>(s, result); })
+        {
+            auto cont = Derived::template continuation_for<S>(s, result);
+            if (cont)
+                EXY_TAIL_CALL cont(s, result);
+            else
+                return nullptr;
+        }
+        else
+        {
+            return Cont::template call<S>(s, result);
+        }
     }
 };
 } // namespace exy

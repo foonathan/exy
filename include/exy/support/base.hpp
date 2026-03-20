@@ -31,7 +31,7 @@ template <typename T>
 concept object = std::is_object_v<T> && std::is_same_v<T, std::remove_cv_t<T>>;
 
 template <typename T>
-concept movable_object = exy::object<T> && std::movable<T>;
+concept movable_object = exy::object<T> && std::move_constructible<T>;
 
 template <typename T>
 concept movable = exy::movable_object<std::remove_cvref_t<T>>;

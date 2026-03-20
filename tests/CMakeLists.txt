@@ -10,6 +10,7 @@ add_executable(exy_tests
     futures/environment.cpp
     futures/factory.cpp
     futures/schedule.cpp
+    futures/stop_point.cpp
     futures/transform.cpp
     futures/when_all.cpp
 )
