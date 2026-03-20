@@ -26,9 +26,10 @@ struct _f : exy::future_base
     template <typename Cont>
     struct op
     {
-        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
+        static constexpr void* start(exy::state_base& s)
         {
-            _f& self = Cont::get_future(s);
+            _f&              self   = Cont::get_future(s);
+            exy::storage_ref result = Cont::get_result_storage(s);
 
             auto cont = [&] {
                 try
@@ -41,7 +42,7 @@ struct _f : exy::future_base
                     return exy::set_exception<signatures, Cont>(result);
                 }
             }();
-            EXY_TAIL_CALL cont(s, result);
+            EXY_TAIL_CALL cont(s);
         }
     };
 };

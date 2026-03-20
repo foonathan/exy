@@ -21,7 +21,6 @@ struct _wany : exy::future_base
     {
         EXY_NO_UNIQUE_ADDRESS exy::pack<exy::state_of<F>...> _base;
         exy::pack<exy::storage<F::storage_spec()>...>        _storage;
-        exy::storage_ref                                     _result;
         std::atomic<unsigned>                                _done = 0;
         exy::continuation                                    _continuation;
 
@@ -55,6 +54,10 @@ struct _wany : exy::future_base
             {
                 return std::get<Idx>(Cont::get_state(s)._base);
             }
+            static constexpr exy::storage_ref get_result_storage(exy::state_base& s) noexcept
+            {
+                return exy::storage_ref(std::get<Idx>(Cont::get_state(s)._storage));
+            }
 
             static constexpr bool override_query(
                 exy::queries::stop_requested_t q, exy::state_base& s
@@ -73,48 +76,36 @@ struct _wany : exy::future_base
             }
 
             template <typename S>
-            static constexpr exy::continuation continuation_for(
-                exy::state_base& s, exy::storage_ref& result
-            ) noexcept
+            static constexpr exy::continuation continuation_for(exy::state_base& s) noexcept
             {
-                state& self = Cont::get_state(s);
+                state&           self   = Cont::get_state(s);
+                exy::storage_ref result = Cont::get_result_storage(s);
 
-                auto [... args] = result.get<S>();
+                exy::storage_ref base_result = get_result_storage(s);
+                auto [... args]              = base_result.get<S>();
 
                 auto prev_count = self._done.fetch_add(1, std::memory_order_acq_rel);
                 if (prev_count == 0)
                 {
                     // First one to complete, store the result.
-                    self._continuation
-                        = exy::set<signatures, Cont, S>(self._result, exy_mov(args)...);
+                    self._continuation = exy::set<signatures, Cont, S>(result, exy_mov(args)...);
                 }
 
                 if (prev_count + 1 == sizeof...(F))
-                {
                     // Last to complete, forward the actual result.
-                    result = self._result;
                     return self._continuation;
-                }
                 else
-                {
                     // Still have to wait for more to complete.
                     return nullptr;
-                }
             }
         };
 
-        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
+        static constexpr void* start(exy::state_base& s)
         {
-            state& self  = Cont::get_state(s);
-            self._result = result;
+            state& self = Cont::get_state(s);
 
             return [&]<std::size_t... Idx>(std::index_sequence<Idx...>) {
-                return (
-                    F::template op<_c<Idx>>::start(
-                        s, exy::storage_ref(std::get<Idx>(self._storage))
-                    ),
-                    ...
-                );
+                return (F::template op<_c<Idx>>::start(s), ...);
             }(std::index_sequence_for<F...>{});
         }
     };

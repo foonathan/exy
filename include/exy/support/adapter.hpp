@@ -39,6 +39,11 @@ namespace exy
 template <typename Derived, typename Cont>
 struct adapter_continuation
 {
+    static constexpr exy::storage_ref get_result_storage(exy::state_base& s)
+    {
+        EXY_TAIL_CALL Cont::get_result_storage(s);
+    }
+
     static constexpr auto query(exy::query auto q, exy::state_base& s)
     {
         if constexpr (requires { Derived::override_query(q, s); })
@@ -48,19 +53,19 @@ struct adapter_continuation
     }
 
     template <typename S>
-    static constexpr void* call(exy::state_base& s, exy::storage_ref result)
+    static constexpr void* call(exy::state_base& s)
     {
-        if constexpr (requires { Derived::template continuation_for<S>(s, result); })
+        if constexpr (requires { Derived::template continuation_for<S>(s); })
         {
-            auto cont = Derived::template continuation_for<S>(s, result);
+            auto cont = Derived::template continuation_for<S>(s);
             if (cont)
-                EXY_TAIL_CALL cont(s, result);
+                EXY_TAIL_CALL cont(s);
             else
                 return nullptr;
         }
         else
         {
-            return Cont::template call<S>(s, result);
+            return Cont::template call<S>(s);
         }
     }
 };

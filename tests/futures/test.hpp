@@ -129,17 +129,6 @@ struct test_result_matcher : Catch::Matchers::MatcherGenericBase
 
 inline constexpr struct test_run_t
 {
-    template <typename Env, typename F>
-    struct _state : exy::state_base
-    {
-        const Env&        _env;
-        F&                _f;
-        exy::state_of<F>  _s;
-        std::atomic<bool> _done = false;
-
-        constexpr explicit _state(const Env& env, F& f) : _env(env), _f(f), _s(f) {}
-    };
-
     template <typename F>
     static consteval auto _storage_spec() noexcept
     {
@@ -147,6 +136,18 @@ inline constexpr struct test_run_t
             F::storage_spec(), exy::storage_spec{sizeof(test_result), alignof(test_result)}
         );
     }
+
+    template <typename Env, typename F>
+    struct _state : exy::state_base
+    {
+        const Env&                       _env;
+        F&                               _f;
+        exy::state_of<F>                 _s;
+        std::atomic<bool>                _done = false;
+        exy::storage<_storage_spec<F>()> _result;
+
+        constexpr explicit _state(const Env& env, F& f) : _env(env), _f(f), _s(f) {}
+    };
 
     template <typename Env, typename F>
     struct _c
@@ -159,6 +160,10 @@ inline constexpr struct test_run_t
         {
             return static_cast<_state<Env, F>&>(s)._s;
         }
+        static constexpr exy::storage_ref get_result_storage(exy::state_base& s) noexcept
+        {
+            return exy::storage_ref(static_cast<_state<Env, F>&>(s)._result);
+        }
 
         static constexpr auto query(exy::query auto q, exy::state_base& s) noexcept
         {
@@ -166,9 +171,10 @@ inline constexpr struct test_run_t
         }
 
         template <typename S>
-        static constexpr void* call(exy::state_base& s, exy::storage_ref result)
+        static constexpr void* call(exy::state_base& s)
         {
-            auto& self = static_cast<_state<Env, F>&>(s);
+            auto& self   = static_cast<_state<Env, F>&>(s);
+            auto  result = get_result_storage(s);
 
             auto [... args] = result.get<S>();
             result.emplace_raw<test_result>(
@@ -187,12 +193,10 @@ inline constexpr struct test_run_t
     {
         _state state(env, f);
 
-        exy::storage<_storage_spec<F>()> result;
-        F::template op<_c<Env, F>>::start(state, result);
-
+        F::template op<_c<Env, F>>::start(state);
         state._done.wait(false, std::memory_order_acquire);
 
-        return exy::storage_ref(result).get_raw<test_result>();
+        return exy::storage_ref(state._result).get_raw<test_result>();
     }
 } test_run;
 

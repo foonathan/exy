@@ -50,11 +50,10 @@ struct _w : exy::future_base
             }
 
             template <exy::signature_with_tag<Tag> S>
-            static constexpr exy::continuation continuation_for(
-                exy::state_base& s, exy::storage_ref result
-            ) noexcept
+            static constexpr exy::continuation continuation_for(exy::state_base& s) noexcept
             {
-                _w& self = Cont::get_future(s);
+                _w&              self   = Cont::get_future(s);
+                exy::storage_ref result = Cont::get_result_storage(s);
 
                 try
                 {
@@ -69,9 +68,9 @@ struct _w : exy::future_base
             }
         };
 
-        static constexpr void* start(exy::state_base& s, exy::storage_ref result)
+        static constexpr void* start(exy::state_base& s)
         {
-            EXY_TAIL_CALL Base::template op<_c>::start(s, result);
+            EXY_TAIL_CALL Base::template op<_c>::start(s);
         }
     };
 };
