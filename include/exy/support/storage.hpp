@@ -89,6 +89,18 @@ public:
         return get_raw<exy::signature_arguments_as<S, _::mp_quote<exy::pack>>>();
     }
 
+    template <typename T>
+    constexpr T& peek_raw() noexcept
+    {
+        return *static_cast<T*>(_ptr);
+    }
+
+    template <typename S>
+    constexpr auto& peek() noexcept
+    {
+        return peek_raw<exy::signature_arguments_as<S, _::mp_quote<exy::pack>>>();
+    }
+
 private:
     void* _ptr;
 };

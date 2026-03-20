@@ -110,7 +110,7 @@ struct _at : exy::future_base
 
                     using sub_t      = exy::invoke_result_t<Fn, decltype(args)...>;
                     auto& sub_future = state._sub_future.template emplace<sub_t>(
-                        exy_invoke(self._fn, exy_mov(args)...)
+                        exy_invoke(exy_mov(self)._fn, exy_mov(args)...)
                     );
                     state._sub_state.template emplace<exy::state_of<sub_t>>(sub_future);
 

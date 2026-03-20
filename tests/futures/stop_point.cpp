@@ -5,6 +5,7 @@
 
 #include <exy/future/factory.hpp>
 #include <exy/future/transform.hpp>
+#include <exy/future/with.hpp>
 #include "test.hpp"
 
 namespace exyf = exy::futures;
@@ -35,10 +36,7 @@ TEST_CASE("stop_point in default environment", "[futures]")
 TEST_CASE("stop_point in stop_env", "[futures]")
 {
     stop_env_t test_env;
-    auto       do_stop = exyf::transform([&](auto x) noexcept {
-        test_env.stop_requested = true;
-        return exy_mov(x);
-    });
+    auto do_stop = exyf::with([&](const auto&...) noexcept { test_env.stop_requested = true; });
 
     test_env.stop_requested = false;
     auto no_stop            = exyf::value(11) | exyf::stop_point;
