@@ -113,6 +113,10 @@ using signatures_insert_exception
     = std::conditional_t<Noexcept, S, _::mp_set_push_back<S, exy::error_tag(std::exception_ptr)>>;
 
 template <typename S>
+concept void_value_signature
+    = std::same_as<_::mp_filter<exy::value_tag::is, S>, exy::signatures<exy::value_tag()>>;
+
+template <typename S>
 concept single_value_signatures
     = _::mp_size<exy::signatures_fold_tag<
           S, exy::value_tag, _::mp_quote<_::mp_list>, _::mp_quote<std::tuple>>>::value
