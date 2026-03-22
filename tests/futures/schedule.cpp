@@ -14,7 +14,7 @@ namespace exys = exy::schedulers;
 
 namespace
 {
-constexpr struct background_backend : exys::parallel_backend
+constexpr struct background_backend : exy::parallel_scheduler_backend
 {
     void schedule(job& j, exy::state_base& s) const override
     {
@@ -24,7 +24,7 @@ constexpr struct background_backend : exys::parallel_backend
     }
 } background_backend;
 
-const struct failing_backend : exys::parallel_backend
+const struct failing_backend : exy::parallel_scheduler_backend
 {
     std::exception_ptr ex = std::make_exception_ptr(0);
 

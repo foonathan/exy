@@ -7,9 +7,9 @@
 #include <exy/support/future.hpp>
 #include <exy/support/scheduler.hpp>
 
-namespace exy::schedulers
+namespace exy
 {
-class parallel_backend
+class parallel_scheduler_backend
 {
 public:
     struct job
@@ -23,21 +23,24 @@ public:
     constexpr virtual void schedule(job& j, exy::state_base& s) const = 0;
 
 protected:
-    parallel_backend()          = default;
-    virtual ~parallel_backend() = default;
+    parallel_scheduler_backend()          = default;
+    virtual ~parallel_scheduler_backend() = default;
 };
+} // namespace exy
 
+namespace exy::schedulers
+{
 class parallel : public exy::scheduler_base
 {
     struct _f : exy::future_base
     {
-        const parallel_backend* _backend;
+        const parallel_scheduler_backend* _backend;
 
         using signatures = exy::signatures<exy::value_tag(), exy::error_tag(std::exception_ptr)>;
 
         struct state : exy::state_base
         {
-            parallel_backend::job _job;
+            parallel_scheduler_backend::job _job;
 
             constexpr state(_f&) noexcept : _job{.continuation = nullptr, .next = nullptr} {}
         };
@@ -80,7 +83,9 @@ class parallel : public exy::scheduler_base
     };
 
 public:
-    constexpr explicit parallel(const parallel_backend& backend) noexcept : _backend(&backend) {}
+    constexpr explicit parallel(const parallel_scheduler_backend& backend) noexcept
+    : _backend(&backend)
+    {}
 
     constexpr _f schedule() const noexcept
     {
@@ -88,7 +93,7 @@ public:
     }
 
 private:
-    const parallel_backend* _backend;
+    const parallel_scheduler_backend* _backend;
 };
 } // namespace exy::schedulers
 
