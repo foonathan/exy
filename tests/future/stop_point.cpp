@@ -30,7 +30,7 @@ TEST_CASE("stop_point in default environment", "[futures]")
 {
     auto f = exyf::value(11) | exyf::stop_point;
     REQUIRE_SIGNATURES(f, exy::value_tag(int), exy::stopped_tag());
-    REQUIRE_FUTURE(f, exy::value_tag(), 11);
+    CHECK_FUTURE(f, exy::value_tag(), 11);
 }
 
 TEST_CASE("stop_point in stop_env", "[futures]")
@@ -41,12 +41,12 @@ TEST_CASE("stop_point in stop_env", "[futures]")
     test_env.stop_requested = false;
     auto no_stop            = exyf::value(11) | exyf::stop_point;
     REQUIRE_SIGNATURES(no_stop, exy::value_tag(int), exy::stopped_tag());
-    REQUIRE_FUTURE(no_stop, exy::value_tag(), 11);
+    CHECK_FUTURE(no_stop, exy::value_tag(), 11);
 
     test_env.stop_requested = false;
     auto stop               = exyf::value(11) | do_stop | exyf::stop_point
                             | exyf::transform([](int) noexcept { FAIL("unreachable"); });
     REQUIRE_SIGNATURES(stop, exy::value_tag(), exy::stopped_tag());
-    REQUIRE_FUTURE(stop, exy::stopped_tag());
+    CHECK_FUTURE(stop, exy::stopped_tag());
 }
 

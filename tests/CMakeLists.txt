@@ -6,16 +6,16 @@ include(CTest)
 include(Catch)
 
 add_executable(exy_tests
-    futures/and_then.cpp
-    futures/environment.cpp
-    futures/factory.cpp
-    futures/repeat.cpp
-    futures/schedule.cpp
-    futures/stop_point.cpp
-    futures/transform.cpp
-    futures/when_all.cpp
-    futures/when_any.cpp
-    futures/with.cpp
+    future/and_then.cpp
+    future/environment.cpp
+    future/factory.cpp
+    future/repeat.cpp
+    future/schedule.cpp
+    future/stop_point.cpp
+    future/transform.cpp
+    future/when_all.cpp
+    future/when_any.cpp
+    future/with.cpp
     scheduler/defer.cpp
 )
 target_link_libraries(exy_tests PRIVATE exy_dev Catch2::Catch2WithMain)

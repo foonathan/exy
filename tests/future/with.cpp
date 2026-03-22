@@ -15,21 +15,21 @@ TEMPLATE_TEST_CASE("with", "[futures]", exy::value_tag, exy::error_tag, exy::sto
 
     auto nullary = factory() | with([]() noexcept {});
     REQUIRE_SIGNATURES(nullary, TestType());
-    REQUIRE_FUTURE(nullary, TestType());
+    CHECK_FUTURE(nullary, TestType());
 
     auto unary = factory(42) | with([](int x) noexcept { REQUIRE(x == 42); });
     REQUIRE_SIGNATURES(unary, TestType(int));
-    REQUIRE_FUTURE(unary, TestType(), 42);
+    CHECK_FUTURE(unary, TestType(), 42);
 
     auto binary = factory(42, 11) | with([](int a, int b) noexcept {
                       REQUIRE(a == 42);
                       REQUIRE(b == 11);
                   });
     REQUIRE_SIGNATURES(binary, TestType(int, int));
-    REQUIRE_FUTURE(binary, TestType(), 42, 11);
+    CHECK_FUTURE(binary, TestType(), 42, 11);
 
     auto throwing_fn = factory() | with([] {});
     REQUIRE_SIGNATURES(throwing_fn, TestType(), exy::error_tag(std::exception_ptr));
-    REQUIRE_FUTURE(throwing_fn, TestType());
+    CHECK_FUTURE(throwing_fn, TestType());
 }
 

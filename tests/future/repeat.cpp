@@ -29,7 +29,7 @@ TEST_CASE("repeat in default environment", "[futures]")
 {
     auto failing = with_signature<exy::value_tag()>(exyf::error(0)) | exyf::repeat;
     REQUIRE_SIGNATURES(failing, exy::error_tag(int), exy::stopped_tag());
-    REQUIRE_FUTURE(failing, exy::error_tag(), 0);
+    CHECK_FUTURE(failing, exy::error_tag(), 0);
 }
 
 TEST_CASE("repeat in stop_env", "[futures]")
@@ -43,11 +43,11 @@ TEST_CASE("repeat in stop_env", "[futures]")
                    })
                  | exyf::repeat;
     REQUIRE_SIGNATURES(nothrow, exy::stopped_tag());
-    REQUIRE_FUTURE(nothrow, exy::stopped_tag());
+    CHECK_FUTURE(nothrow, exy::stopped_tag());
 
     test_env.stop_requested = false;
     auto failing            = with_signature<exy::value_tag()>(exyf::error(0)) | exyf::repeat;
     REQUIRE_SIGNATURES(failing, exy::error_tag(int), exy::stopped_tag());
-    REQUIRE_FUTURE(failing, exy::error_tag(), 0);
+    CHECK_FUTURE(failing, exy::error_tag(), 0);
 }
 

@@ -70,17 +70,17 @@ TEST_CASE("read_env in env_without_default", "[futures]")
 
     auto read_int = exyf::read_env<>(query_int);
     REQUIRE_SIGNATURES(read_int, exy::value_tag(int));
-    REQUIRE_FUTURE(read_int, exy::value_tag(), 11);
+    CHECK_FUTURE(read_int, exy::value_tag(), 11);
 
     auto read_int_default = exyf::read_env<>(query_int_default);
     REQUIRE_SIGNATURES(read_int_default, exy::value_tag(int));
-    REQUIRE_FUTURE(read_int_default, exy::value_tag(), -1);
+    CHECK_FUTURE(read_int_default, exy::value_tag(), -1);
 
     auto read_move_only = exyf::read_env<>(query_move_only);
     REQUIRE_SIGNATURES(
         read_move_only, exy::value_tag(move_only), exy::error_tag(std::exception_ptr)
     );
-    REQUIRE_FUTURE(read_move_only, exy::value_tag(), move_only(17));
+    CHECK_FUTURE(read_move_only, exy::value_tag(), move_only(17));
 }
 
 TEST_CASE("read_env in env_with_default", "[futures]")
@@ -89,17 +89,17 @@ TEST_CASE("read_env in env_with_default", "[futures]")
 
     auto read_int = exyf::read_env(query_int);
     REQUIRE_SIGNATURES(read_int, exy::value_tag(int));
-    REQUIRE_FUTURE(read_int, exy::value_tag(), 11);
+    CHECK_FUTURE(read_int, exy::value_tag(), 11);
 
     auto read_int_default = exyf::read_env(query_int_default);
     REQUIRE_SIGNATURES(read_int_default, exy::value_tag(int));
-    REQUIRE_FUTURE(read_int_default, exy::value_tag(), 42);
+    CHECK_FUTURE(read_int_default, exy::value_tag(), 42);
 
     auto read_move_only = exyf::read_env(query_move_only);
     REQUIRE_SIGNATURES(
         read_move_only, exy::value_tag(move_only), exy::error_tag(std::exception_ptr)
     );
-    REQUIRE_FUTURE(read_move_only, exy::value_tag(), move_only(17));
+    CHECK_FUTURE(read_move_only, exy::value_tag(), move_only(17));
 }
 
 TEST_CASE("read_env(fn) in env_without_default", "[futures]")
@@ -111,20 +111,20 @@ TEST_CASE("read_env(fn) in env_without_default", "[futures]")
         query_untyped
     );
     REQUIRE_SIGNATURES(with, exy::value_tag(int), exy::error_tag(std::exception_ptr));
-    REQUIRE_FUTURE(with, exy::value_tag(), -1 + 5);
+    CHECK_FUTURE(with, exy::value_tag(), -1 + 5);
 
     auto with_nothrow = exyf::read_env<int, true>(
         [](int a, std::string_view b) { return a + int(b.size()); }, query_int_default,
         query_untyped
     );
     REQUIRE_SIGNATURES(with_nothrow, exy::value_tag(int));
-    REQUIRE_FUTURE(with_nothrow, exy::value_tag(), -1 + 5);
+    CHECK_FUTURE(with_nothrow, exy::value_tag(), -1 + 5);
 
     auto with_move_only = exyf::read_env<move_only, true>(std::identity{}, query_move_only);
     REQUIRE_SIGNATURES(
         with_move_only, exy::value_tag(move_only), exy::error_tag(std::exception_ptr)
     );
-    REQUIRE_FUTURE(with_move_only, exy::value_tag(), move_only(17));
+    CHECK_FUTURE(with_move_only, exy::value_tag(), move_only(17));
 }
 
 TEST_CASE("read_env(fn) in env_with_default", "[futures]")
@@ -136,19 +136,19 @@ TEST_CASE("read_env(fn) in env_with_default", "[futures]")
         query_untyped
     );
     REQUIRE_SIGNATURES(with, exy::value_tag(int), exy::error_tag(std::exception_ptr));
-    REQUIRE_FUTURE(with, exy::value_tag(), 42 + 5);
+    CHECK_FUTURE(with, exy::value_tag(), 42 + 5);
 
     auto with_nothrow = exyf::read_env<int, true>(
         [](int a, std::string_view b) { return a + int(b.size()); }, query_int_default,
         query_untyped
     );
     REQUIRE_SIGNATURES(with_nothrow, exy::value_tag(int));
-    REQUIRE_FUTURE(with_nothrow, exy::value_tag(), 42 + 5);
+    CHECK_FUTURE(with_nothrow, exy::value_tag(), 42 + 5);
 
     auto with_move_only = exyf::read_env<move_only, true>(std::identity{}, query_move_only);
     REQUIRE_SIGNATURES(
         with_move_only, exy::value_tag(move_only), exy::error_tag(std::exception_ptr)
     );
-    REQUIRE_FUTURE(with_move_only, exy::value_tag(), move_only(17));
+    CHECK_FUTURE(with_move_only, exy::value_tag(), move_only(17));
 }
 

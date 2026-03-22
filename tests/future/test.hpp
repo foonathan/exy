@@ -212,8 +212,8 @@ inline constexpr struct test_env_t
     }
 } test_env;
 
-#define REQUIRE_FUTURE(expr, ...)                                                                  \
-    REQUIRE_THAT(test_run(test_env, auto(expr)), test_result_matcher(__VA_ARGS__))
+#define CHECK_FUTURE(expr, ...)                                                                    \
+    CHECK_THAT(test_run(test_env, auto(expr)), test_result_matcher(__VA_ARGS__))
 
 #define REQUIRE_SIGNATURES(expr, ...)                                                              \
     static_assert(std::same_as<exy::signatures_of<decltype(expr)>, exy::signatures<__VA_ARGS__>>)
