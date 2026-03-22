@@ -16,6 +16,7 @@ add_executable(exy_tests
     futures/when_all.cpp
     futures/when_any.cpp
     futures/with.cpp
+    scheduler/defer.cpp
 )
 target_link_libraries(exy_tests PRIVATE exy_dev Catch2::Catch2WithMain)
 target_compile_options(exy_tests PRIVATE -Wno-c2y-extensions)
