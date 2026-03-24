@@ -1,5 +1,5 @@
 // Copyright (C) 2025 Jonathan Müller and v:null contributors
-// SPDX-License-Identifier: BSL-1.0
+// SPDX-License-Identifier: EUPL-1.2
 
 #include <cstdio>
 

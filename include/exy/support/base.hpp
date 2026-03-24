@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Jonathan Müller and exy contributors
-// SPDX-License-Identifier: BSL-1.0
+// SPDX-License-Identifier: EUPL-1.2
 
 #ifndef EXY_SUPPORT_BASE_HPP_INCLUDED
 #define EXY_SUPPORT_BASE_HPP_INCLUDED

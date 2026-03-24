@@ -1,5 +1,5 @@
 // Copyright (C) 2026 Jonathan Müller and exy contributors
-// SPDX-License-Identifier: BSL-1.0
+// SPDX-License-Identifier: EUPL-1.2
 
 #include <exy/future/factory.hpp>
 
