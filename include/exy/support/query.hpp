@@ -13,8 +13,6 @@ struct query_base
 
 template <typename T>
 concept query = std::derived_from<T, query_base>;
-template <typename T, typename Env>
-using query_result_t = decltype(std::declval<T>()(std::declval<Env>()));
 
 template <typename T>
 concept typed_query = query<T> && requires { typename T::result_type; };
@@ -24,12 +22,11 @@ using typed_query_result_t = typename T::result_type;
 struct no_such_query
 {};
 
-template <typename T>
-concept _is_query_result = !std::same_as<T, no_such_query>;
 template <typename Env, typename Q, typename... Args>
-concept has_query = query<Q> && requires (Q q, Args&&... args) {
-    { Env::query(q, exy_fwd(args)...) } -> _is_query_result;
-};
+using query_result_t = decltype(Env::query(std::declval<Q>(), std::declval<Args...>()));
+
+template <typename Env, typename Q, typename... Args>
+concept has_query = query<Q> && !std::same_as<query_result_t<Env, Q, Args...>, no_such_query>;
 
 template <typename Env>
 constexpr auto query_or_default(query auto q, auto&&... args) noexcept
@@ -41,6 +38,9 @@ constexpr auto query_or_default(query auto q, auto&&... args) noexcept
     else
         static_assert(_::mp_error<decltype(q)>::value, "query not supported");
 }
+template <typename Env, typename Q, typename... Args>
+using query_or_default_t
+    = decltype(query_or_default<Env>(std::declval<Q>(), std::declval<Args>()...));
 } // namespace exy
 
 #endif // EXY_SUPPORT_QUERY_HPP_INCLUDED
