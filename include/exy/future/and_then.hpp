@@ -148,8 +148,8 @@ struct and_then_t
 };
 
 inline constexpr and_then_t<exy::value_tag>   and_then;
-inline constexpr and_then_t<exy::error_tag>   and_then_error;
-inline constexpr and_then_t<exy::stopped_tag> and_then_stopped;
+inline constexpr and_then_t<exy::error_tag>   or_else_error;
+inline constexpr and_then_t<exy::stopped_tag> or_else_stopped;
 } // namespace exy::futures
 
 #endif // EXY_FUTURE_AND_THEN_HPP_INCLUDED
