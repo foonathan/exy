@@ -110,9 +110,12 @@ struct _wany : exy::future_base
         {
             state& self = Cont::get_state(s);
 
-            return [&]<std::size_t... Idx>(std::index_sequence<Idx...>) {
-                return (F::template op<_c<Idx>>::start(s), ...);
-            }(std::index_sequence_for<F...>{});
+            [&]<typename... FI, std::size_t... Idx>(
+                _::mp_list<FI...>, std::index_sequence<Idx...>
+            ) {
+                (FI::template op<_c<Idx>>::start(s), ...);
+            }(_::mp_pop_back<_::mp_list<F...>>{}, std::make_index_sequence<sizeof...(F) - 1>{});
+            EXY_TAIL_CALL F...[sizeof...(F) - 1] ::template op<_c<sizeof...(F) - 1>>::start(s);
         }
     };
 };
