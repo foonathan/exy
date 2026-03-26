@@ -24,10 +24,6 @@ struct _w : exy::future_base
     struct state : exy::state_base
     {
         EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _base;
-
-        constexpr explicit state(_w& self) noexcept(exy::has_nothrow_constructible_state<Base>)
-        : _base(self._base)
-        {}
     };
 
     static consteval auto storage_spec() noexcept

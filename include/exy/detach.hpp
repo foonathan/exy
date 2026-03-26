@@ -18,10 +18,8 @@ inline constexpr struct detach_t
         exy::state_of<F>                _s;
         exy::storage<F::storage_spec()> _result;
 
-        constexpr explicit _state(
-            F&& f
-        ) noexcept(std::is_nothrow_move_assignable_v<F> && exy::has_nothrow_constructible_state<F>)
-        : _f(exy_mov(f)), _s(_f)
+        constexpr explicit _state(F&& f) noexcept(std::is_nothrow_move_constructible_v<F>)
+        : _f(exy_mov(f))
         {}
     };
 

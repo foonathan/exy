@@ -24,18 +24,10 @@ template <typename F>
 using signatures_of = typename F::signatures;
 template <typename F>
 using state_of = typename F::state;
-template <typename F>
-concept has_nothrow_constructible_state = std::is_nothrow_constructible_v<state_of<F>, F&>;
 
 struct state_base
 {
-    state_base() = default;
-
-    template <exy::future F>
-        requires std::same_as<state_of<F>, state_base>
-    constexpr explicit state_base(F&) noexcept
-    {}
-
+    state_base()                             = default;
     state_base(const state_base&)            = delete;
     state_base& operator=(const state_base&) = delete;
     ~state_base()                            = default;

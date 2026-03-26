@@ -28,10 +28,6 @@ struct _at : exy::future_base
     using _fn_result_types
         = exy::invoke_results_of_signature_tag<Fn, exy::signatures_of<Base>, Tag>;
 
-    template <typename F>
-    using _state_is_nothrow_constructible
-        = std::bool_constant<exy::has_nothrow_constructible_state<F>>;
-
     using signatures = exy::signatures_insert_exception<
         exy::signatures_replace_tag<
             exy::signatures_of<Base>, Tag,
@@ -39,9 +35,7 @@ struct _at : exy::future_base
                 _::mp_transform<exy::signatures_of, _fn_result_types>, exy::signatures>>>,
         // The function must be nothrow.
         exy::signatures_all_of_tag<
-            exy::signatures_of<Base>, Tag, _::mp_bind_front<exy::is_nothrow_invocable, Fn>>
-            // And we must be able to nothrow move construct the state.
-            && _::mp_all_of<_fn_result_types, _state_is_nothrow_constructible>::value>;
+            exy::signatures_of<Base>, Tag, _::mp_bind_front<exy::is_nothrow_invocable, Fn>>>;
 
     struct state : exy::state_base
     {
@@ -52,10 +46,6 @@ struct _at : exy::future_base
             _::mp_set_push_front<
                 _::mp_transform<exy::state_of, _fn_result_types>, exy::state_of<Base>>>
             _sub_state;
-
-        constexpr explicit state(_at& self) noexcept(exy::has_nothrow_constructible_state<Base>)
-        : _sub_state(std::in_place_type<exy::state_of<Base>>, self._base)
-        {}
     };
 
     static consteval auto storage_spec() noexcept
@@ -107,11 +97,11 @@ struct _at : exy::future_base
                 {
                     auto [... args] = result.get<S>();
 
-                    using sub_t      = exy::invoke_result_t<Fn, decltype(args)...>;
-                    auto& sub_future = state._sub_future.template emplace<sub_t>(
+                    using sub_t = exy::invoke_result_t<Fn, decltype(args)...>;
+                    state._sub_future.template emplace<sub_t>(
                         exy_invoke(exy_mov(self)._fn, exy_mov(args)...)
                     );
-                    state._sub_state.template emplace<exy::state_of<sub_t>>(sub_future);
+                    state._sub_state.template emplace<exy::state_of<sub_t>>();
 
                     return &sub_t::template op<_cs<sub_t>>::start;
                 }

@@ -146,7 +146,7 @@ inline constexpr struct test_run_t
         std::atomic<bool>                _done = false;
         exy::storage<_storage_spec<F>()> _result;
 
-        constexpr explicit _state(const Env& env, F& f) : _env(env), _f(f), _s(f) {}
+        constexpr explicit _state(const Env& env, F& f) noexcept : _env(env), _f(f) {}
     };
 
     template <typename Env, typename F>

@@ -41,8 +41,6 @@ class parallel : public exy::scheduler_base
         struct state : exy::state_base
         {
             parallel_scheduler_backend::job _job;
-
-            constexpr state(_f&) noexcept : _job{.continuation = nullptr, .next = nullptr} {}
         };
 
         static consteval auto storage_spec() noexcept

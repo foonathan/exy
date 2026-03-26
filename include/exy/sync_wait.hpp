@@ -28,9 +28,7 @@ inline constexpr struct sync_wait_t
         std::atomic<bool>               _done = false;
         exy::storage<F::storage_spec()> _result;
 
-        constexpr explicit _state(F& f) noexcept(exy::has_nothrow_constructible_state<F>)
-        : _f(f), _s(f)
-        {}
+        constexpr explicit _state(F& f) noexcept : _f(f) {}
 
         void complete() noexcept
         {

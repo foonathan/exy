@@ -118,8 +118,6 @@ class defer : public exy::scheduler_base
         struct state : exy::state_base
         {
             exy::run_loop::job _job;
-
-            constexpr state(_f&) noexcept : _job{} {}
         };
 
         static consteval auto storage_spec() noexcept

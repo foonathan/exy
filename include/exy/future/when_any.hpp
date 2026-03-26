@@ -29,15 +29,6 @@ struct _wany : exy::future_base
         exy::pack<exy::storage<F::storage_spec()>...>        _storage;
         std::atomic<unsigned>                                _done = 0;
         exy::continuation                                    _continuation;
-
-        constexpr explicit state(_wany& self) noexcept(
-            (exy::has_nothrow_constructible_state<F> && ...)
-        )
-        : _base([&] {
-              auto& [... f] = self._base;
-              return decltype(_base)(f...);
-          }())
-        {}
     };
 
     static consteval auto storage_spec() noexcept

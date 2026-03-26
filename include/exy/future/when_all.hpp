@@ -34,15 +34,6 @@ struct _wall : exy::future_base
         std::atomic<exy::continuation>                       _error_continuation = nullptr;
         std::atomic<unsigned>                                _done               = 0;
 
-        constexpr explicit state(_wall& self) noexcept(
-            (exy::has_nothrow_constructible_state<F> && ...)
-        )
-        : _base([&] {
-              auto& [... f] = self._base;
-              return decltype(_base)(f...);
-          }())
-        {}
-
         template <typename Cont>
         exy::continuation complete(exy::storage_ref result) noexcept
         {

@@ -45,13 +45,6 @@ struct _co : exy::future_base
         EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _base;
         EXY_NO_UNIQUE_ADDRESS exy::state_of<SchF>                        _sch;
         exy::storage<exy::storage_spec::get(exy::signatures_of<SchF>())> _sch_result;
-
-        constexpr explicit state(_co& self) noexcept(
-            std::is_nothrow_constructible_v<exy::state_of<Base>, Base&>
-            && std::is_nothrow_constructible_v<exy::state_of<SchF>, SchF&>
-        )
-        : _base(self._base), _sch(self._sch)
-        {}
     };
 
     static consteval auto storage_spec() noexcept

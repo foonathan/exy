@@ -18,7 +18,7 @@ struct _r : exy::future_base
     using signatures = exy::signatures_insert_exception<
         exy::signatures_replace_tag<
             exy::signatures_of<Base>, exy::value_tag, exy::signatures<exy::stopped_tag()>>,
-        std::is_nothrow_copy_constructible_v<Base> && exy::has_nothrow_constructible_state<Base>>;
+        std::is_nothrow_copy_constructible_v<Base>>;
 
     struct state : exy::state_base
     {
@@ -27,24 +27,13 @@ struct _r : exy::future_base
             Base                  future;
             EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> state;
 
-            explicit impl(const Base& base) noexcept(
-                std::is_nothrow_copy_constructible_v<Base>
-                && exy::has_nothrow_constructible_state<Base>
-            )
-            : future(base), state(future)
+            explicit impl(const Base& base) noexcept(std::is_nothrow_copy_constructible_v<Base>)
+            : future(base)
             {}
         };
         std::optional<impl> _impl;
 
-        constexpr explicit state(_r& self) noexcept(
-            std::is_nothrow_copy_constructible_v<Base> && exy::has_nothrow_constructible_state<Base>
-        )
-        : _impl(self._base)
-        {}
-
-        void reset(const Base& base) noexcept(
-            std::is_nothrow_copy_constructible_v<Base> && exy::has_nothrow_constructible_state<Base>
-        )
+        void reset(const Base& base) noexcept(std::is_nothrow_copy_constructible_v<Base>)
         {
             _impl.reset();
             _impl.emplace(base);
@@ -59,6 +48,19 @@ struct _r : exy::future_base
     template <typename Cont>
     struct op
     {
+        static constexpr exy::continuation _restart(exy::state_base& s) noexcept
+        {
+            try
+            {
+                Cont::get_state(s).reset(Cont::get_future(s)._base);
+                return &Base::template op<_c>::start;
+            }
+            catch (...)
+            {
+                return exy::set_exception<signatures, Cont>(Cont::get_result_storage(s));
+            }
+        }
+
         struct _c : exy::adapter_continuation<_c, Cont>
         {
             static constexpr Base& get_future(exy::state_base& s) noexcept
@@ -78,22 +80,14 @@ struct _r : exy::future_base
 
                 if (exy::query_or_default<Cont>(queries::stop_requested, s))
                     return exy::set<signatures, Cont, exy::stopped_tag()>(result);
-
-                try
-                {
-                    Cont::get_state(s).reset(Cont::get_future(s)._base);
-                    return &Base::template op<_c>::start;
-                }
-                catch (...)
-                {
-                    return exy::set_exception<signatures, Cont>(result);
-                }
+                else
+                    return _restart(s);
             }
         };
 
         static constexpr void* start(exy::state_base& s)
         {
-            EXY_TAIL_CALL Base::template op<_c>::start(s);
+            EXY_TAIL_CALL _restart(s)(s);
         }
     };
 };
