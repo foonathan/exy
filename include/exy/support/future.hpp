@@ -26,12 +26,7 @@ template <typename F>
 using state_of = typename F::state;
 
 struct state_base
-{
-    state_base()                             = default;
-    state_base(const state_base&)            = delete;
-    state_base& operator=(const state_base&) = delete;
-    ~state_base()                            = default;
-};
+{};
 
 using continuation = void* (*)(exy::state_base&);
 
