@@ -16,10 +16,7 @@ struct _sp : exy::future_base
 
     using signatures = _::mp_set_push_back<exy::signatures_of<Base>, exy::stopped_tag()>;
 
-    struct state : exy::state_base
-    {
-        EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _base;
-    };
+    using state = exy::state_of<Base>;
 
     static consteval auto storage_spec() noexcept
     {
@@ -34,10 +31,6 @@ struct _sp : exy::future_base
             static constexpr Base& get_future(exy::state_base& s) noexcept
             {
                 return Cont::get_future(s)._base;
-            }
-            static constexpr exy::state_of<Base>& get_state(exy::state_base& s) noexcept
-            {
-                return Cont::get_state(s)._base;
             }
 
             template <typename S>

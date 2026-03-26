@@ -21,10 +21,7 @@ struct _w : exy::future_base
         exy::signatures_all_of_tag<
             exy::signatures_of<Base>, Tag, _::mp_bind_front<exy::is_nothrow_invocable, Fn>>>;
 
-    struct state : exy::state_base
-    {
-        EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _base;
-    };
+    using state = exy::state_of<Base>;
 
     static consteval auto storage_spec() noexcept
     {

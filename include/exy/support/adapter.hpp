@@ -43,6 +43,10 @@ struct adapter_continuation
     {
         EXY_TAIL_CALL Cont::get_result_storage(s);
     }
+    static constexpr auto& get_state(exy::state_base& s) noexcept
+    {
+        return Cont::get_state(s);
+    }
 
     static constexpr auto query(exy::query auto q, exy::state_base& s)
     {
