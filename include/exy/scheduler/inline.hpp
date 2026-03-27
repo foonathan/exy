@@ -15,8 +15,6 @@ inline constexpr struct inline_t : exy::scheduler_base
     {
         using signatures = exy::signatures<exy::value_tag()>;
 
-        using state = exy::state_base;
-
         static consteval auto storage_spec() noexcept
         {
             return exy::storage_spec::get(signatures());
@@ -25,10 +23,10 @@ inline constexpr struct inline_t : exy::scheduler_base
         template <typename Cont>
         struct op
         {
-            static constexpr void* start(exy::state_base& s)
+            static constexpr void* start(exy::ctx_base& ctx)
             {
-                exy::storage_ref result = Cont::get_result_storage(s);
-                EXY_TAIL_CALL    exy::set<signatures, Cont, exy::value_tag()>(result)(s);
+                exy::storage_ref result = Cont::get_result_storage(ctx);
+                EXY_TAIL_CALL    exy::set<signatures, Cont, exy::value_tag()>(result)(ctx);
             }
         };
     };

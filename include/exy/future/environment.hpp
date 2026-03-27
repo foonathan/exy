@@ -19,8 +19,6 @@ struct _re : exy::future_base
         exy::signatures<exy::value_tag(exy::typed_query_result_t<Q>)>,
         std::is_nothrow_move_constructible_v<exy::typed_query_result_t<Q>>>;
 
-    using state = exy::state_base;
-
     static consteval auto storage_spec() noexcept
     {
         return exy::storage_spec::get(signatures());
@@ -29,15 +27,15 @@ struct _re : exy::future_base
     template <typename Cont>
     struct op
     {
-        static constexpr void* start(exy::state_base& s)
+        static constexpr void* start(exy::ctx_base& ctx)
         {
-            exy::storage_ref result = Cont::get_result_storage(s);
+            exy::storage_ref result = Cont::get_result_storage(ctx);
 
             auto cont = [&] {
                 try
                 {
                     return exy::set<signatures, Cont, exy::value_tag(exy::typed_query_result_t<Q>)>(
-                        result, exy::query_or_default<Cont>(Cont::get_future(s)._q, s)
+                        result, exy::query_or_default<Cont>(Cont::get_future(ctx)._q, ctx)
                     );
                 }
                 catch (...)
@@ -45,7 +43,7 @@ struct _re : exy::future_base
                     return exy::set_exception<signatures, Cont>(result);
                 }
             }();
-            EXY_TAIL_CALL cont(s);
+            EXY_TAIL_CALL cont(ctx);
         }
     };
 };
@@ -59,8 +57,6 @@ struct _ref : exy::future_base
     using signatures = exy::signatures_insert_exception<
         exy::signatures<exy::value_tag(T)>, std::is_nothrow_move_constructible_v<T> && NoexceptFn>;
 
-    using state = exy::state_base;
-
     static consteval auto storage_spec() noexcept
     {
         return exy::storage_spec::get(signatures());
@@ -69,17 +65,17 @@ struct _ref : exy::future_base
     template <typename Cont>
     struct op
     {
-        static constexpr void* start(exy::state_base& s)
+        static constexpr void* start(exy::ctx_base& ctx)
         {
-            _ref&            self   = Cont::get_future(s);
-            exy::storage_ref result = Cont::get_result_storage(s);
+            _ref&            self   = Cont::get_future(ctx);
+            exy::storage_ref result = Cont::get_result_storage(ctx);
 
             auto cont = [&] {
                 try
                 {
                     auto [... q] = self._q;
                     return exy::set<signatures, Cont, exy::value_tag(T)>(
-                        result, exy_invoke(self._fn, exy::query_or_default<Cont>(q, s)...)
+                        result, exy_invoke(self._fn, exy::query_or_default<Cont>(q, ctx)...)
                     );
                 }
                 catch (...)
@@ -87,7 +83,7 @@ struct _ref : exy::future_base
                     return exy::set_exception<signatures, Cont>(result);
                 }
             }();
-            EXY_TAIL_CALL cont(s);
+            EXY_TAIL_CALL cont(ctx);
         }
     };
 };

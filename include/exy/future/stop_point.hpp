@@ -16,8 +16,6 @@ struct _sp : exy::future_base
 
     using signatures = _::mp_set_push_back<exy::signatures_of<Base>, exy::stopped_tag()>;
 
-    using state = exy::state_of<Base>;
-
     static consteval auto storage_spec() noexcept
     {
         return Base::storage_spec();
@@ -28,28 +26,35 @@ struct _sp : exy::future_base
     {
         struct _c : exy::adapter_continuation<_c, Cont>
         {
-            static constexpr Base& get_future(exy::state_base& s) noexcept
+            static constexpr Base& get_future(exy::ctx_base& ctx) noexcept
             {
-                return Cont::get_future(s)._base;
+                return Cont::get_future(ctx)._base;
+            }
+            static constexpr exy::op_of<Base, _c>& get_op(exy::ctx_base& ctx) noexcept
+            {
+                return Cont::get_op(ctx)._base;
             }
 
             template <typename S>
-                requires exy::has_query<Cont, exy::queries::stop_requested_t, exy::state_base&>
+                requires exy::has_query<Cont, exy::queries::stop_requested_t, exy::ctx_base&>
                       && (!exy::signature_with_tag<S, exy::stopped_tag>)
-            static constexpr exy::continuation continuation_for(exy::state_base& s) noexcept
+            static constexpr exy::continuation continuation_for(exy::ctx_base& ctx) noexcept
             {
-                if (!Cont::query(exy::queries::stop_requested, s))
+                if (!Cont::query(exy::queries::stop_requested, ctx))
                     return &Cont::template call<S>;
 
-                exy::storage_ref result = Cont::get_result_storage(s);
+                exy::storage_ref result = Cont::get_result_storage(ctx);
                 (void)result.get<S>(); // destroy
                 return exy::set<signatures, Cont, exy::stopped_tag()>(result);
             }
         };
 
-        static constexpr void* start(exy::state_base& s)
+        exy::op_of<Base, _c> _base;
+
+        static constexpr void* start(exy::ctx_base& ctx)
         {
-            EXY_TAIL_CALL Base::template op<_c>::start(s);
+            op&           self = Cont::get_op(ctx);
+            EXY_TAIL_CALL self._base.start(ctx);
         }
     };
 };

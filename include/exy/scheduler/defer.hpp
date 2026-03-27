@@ -21,7 +21,7 @@ class run_loop
     struct job
     {
         exy::continuation continuation;
-        exy::state_base*  s;
+        exy::ctx_base*    s;
         job*              next;
     };
 
@@ -115,7 +115,7 @@ class defer : public exy::scheduler_base
 
         using signatures = exy::signatures<exy::value_tag()>;
 
-        struct state : exy::state_base
+        struct state : exy::ctx_base
         {
             exy::run_loop::job _job;
         };
@@ -128,17 +128,19 @@ class defer : public exy::scheduler_base
         template <typename Cont>
         struct op
         {
-            static constexpr void* start(exy::state_base& s)
-            {
-                _f&              self   = Cont::get_future(s);
-                state&           state  = Cont::get_state(s);
-                exy::storage_ref result = Cont::get_result_storage(s);
+            exy::run_loop::job _job;
 
-                state._job = {
+            static constexpr void* start(exy::ctx_base& ctx)
+            {
+                op&              self   = Cont::get_op(ctx);
+                _f&              f      = Cont::get_future(ctx);
+                exy::storage_ref result = Cont::get_result_storage(ctx);
+
+                self._job = {
                     .continuation = exy::set<signatures, Cont, exy::value_tag()>(result),
-                    .s            = &s,
+                    .s            = &ctx,
                 };
-                self._loop->push(&state._job);
+                f._loop->push(&self._job);
                 return nullptr;
             }
         };

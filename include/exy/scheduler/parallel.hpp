@@ -20,7 +20,7 @@ public:
     };
 
     /// The job reference is valid until the continuation is called.
-    constexpr virtual void schedule(job& j, exy::state_base& s) const = 0;
+    constexpr virtual void schedule(job& j, exy::ctx_base& ctx) const = 0;
 
 protected:
     parallel_scheduler_backend()          = default;
@@ -38,11 +38,6 @@ class parallel : public exy::scheduler_base
 
         using signatures = exy::signatures<exy::value_tag(), exy::error_tag(std::exception_ptr)>;
 
-        struct state : exy::state_base
-        {
-            parallel_scheduler_backend::job _job;
-        };
-
         static consteval auto storage_spec() noexcept
         {
             return exy::storage_spec::get(signatures());
@@ -51,20 +46,22 @@ class parallel : public exy::scheduler_base
         template <typename Cont>
         struct op
         {
-            static constexpr void* start(exy::state_base& s)
+            parallel_scheduler_backend::job _job;
+
+            static constexpr void* start(exy::ctx_base& ctx)
             {
-                _f&              self   = Cont::get_future(s);
-                state&           state  = Cont::get_state(s);
-                exy::storage_ref result = Cont::get_result_storage(s);
+                op&              self   = Cont::get_op(ctx);
+                _f&              f      = Cont::get_future(ctx);
+                exy::storage_ref result = Cont::get_result_storage(ctx);
 
                 auto cont = [&] -> exy::continuation {
                     try
                     {
-                        state._job = {
+                        self._job = {
                             .next         = nullptr,
                             .continuation = exy::set<signatures, Cont, exy::value_tag()>(result),
                         };
-                        self._backend->schedule(state._job, s);
+                        f._backend->schedule(self._job, ctx);
                         return nullptr;
                     }
                     catch (...)
@@ -73,7 +70,7 @@ class parallel : public exy::scheduler_base
                     }
                 }();
                 if (cont)
-                    EXY_TAIL_CALL cont(s);
+                    EXY_TAIL_CALL cont(ctx);
                 else
                     return nullptr;
             }

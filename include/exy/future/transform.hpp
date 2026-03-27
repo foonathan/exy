@@ -38,8 +38,6 @@ struct _t : exy::future_base
                 _transformed_values, TagTo,
                 _::mp_compose<exy::pack, std::is_nothrow_move_constructible>>>;
 
-    using state = exy::state_of<Base>;
-
     static consteval auto storage_spec() noexcept
     {
         return exy::max(Base::storage_spec(), exy::storage_spec::get(signatures()));
@@ -50,16 +48,20 @@ struct _t : exy::future_base
     {
         struct _c : exy::adapter_continuation<_c, Cont>
         {
-            static constexpr Base& get_future(exy::state_base& s) noexcept
+            static constexpr Base& get_future(exy::ctx_base& ctx) noexcept
             {
-                return Cont::get_future(s)._base;
+                return Cont::get_future(ctx)._base;
+            }
+            static constexpr exy::op_of<Base, _c>& get_op(exy::ctx_base& ctx) noexcept
+            {
+                return Cont::get_op(ctx)._base;
             }
 
             template <exy::signature_with_tag<TagFrom> S>
-            static constexpr exy::continuation continuation_for(exy::state_base& s) noexcept
+            static constexpr exy::continuation continuation_for(exy::ctx_base& ctx) noexcept
             {
-                _t&              self   = Cont::get_future(s);
-                exy::storage_ref result = Cont::get_result_storage(s);
+                _t&              self   = Cont::get_future(ctx);
+                exy::storage_ref result = Cont::get_result_storage(ctx);
 
                 using transformed_type
                     = exy::signature_arguments_as<S, _::mp_bind_front<exy::invoke_result_t, Fn&&>>;
@@ -86,9 +88,12 @@ struct _t : exy::future_base
             }
         };
 
-        static constexpr void* start(exy::state_base& s)
+        exy::op_of<Base, _c> _base;
+
+        static constexpr void* start(exy::ctx_base& ctx)
         {
-            EXY_TAIL_CALL Base::template op<_c>::start(s);
+            op&           self = Cont::get_op(ctx);
+            EXY_TAIL_CALL self._base.start(ctx);
         }
     };
 };

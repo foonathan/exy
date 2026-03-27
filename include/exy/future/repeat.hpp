@@ -20,29 +20,6 @@ struct _r : exy::future_base
             exy::signatures_of<Base>, exy::value_tag, exy::signatures<exy::stopped_tag()>>,
         std::is_nothrow_copy_constructible_v<Base>>;
 
-    struct _simple_state : exy::state_base
-    {
-        EXY_NO_UNIQUE_ADDRESS Base _future;
-        EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _state;
-    };
-
-    struct _optional_state : exy::state_base
-    {
-        struct impl
-        {
-            EXY_NO_UNIQUE_ADDRESS Base future;
-            EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> state;
-
-            explicit impl(const Base& base) : future(base) {}
-        };
-        std::optional<impl> _impl;
-    };
-
-    using state = std::conditional_t<
-        std::is_default_constructible_v<Base> && std::is_copy_assignable_v<Base>
-            && std::is_move_assignable_v<exy::state_of<Base>>,
-        _simple_state, _optional_state>;
-
     static consteval auto storage_spec() noexcept
     {
         return exy::max(Base::storage_spec(), exy::storage_spec::get(signatures()));
@@ -51,62 +28,89 @@ struct _r : exy::future_base
     template <typename Cont>
     struct op
     {
-        static constexpr exy::continuation _restart(exy::state_base& s) noexcept
+        struct _c;
+
+        struct _simple_state : exy::ctx_base
         {
-            _r&    f    = Cont::get_future(s);
-            state& self = Cont::get_state(s);
+            EXY_NO_UNIQUE_ADDRESS Base future;
+            EXY_NO_UNIQUE_ADDRESS exy::op_of<Base, _c> op;
+        };
+
+        struct _optional_state : exy::ctx_base
+        {
+            struct impl
+            {
+                EXY_NO_UNIQUE_ADDRESS Base future;
+                EXY_NO_UNIQUE_ADDRESS exy::op_of<Base, _c> op;
+
+                explicit impl(const Base& base) : future(base) {}
+            };
+            std::optional<impl> impl;
+        };
+
+        std::conditional_t<
+            std::is_default_constructible_v<Base> && std::is_copy_assignable_v<Base>
+                && std::is_move_assignable_v<exy::op_of<Base, _c>>,
+            _simple_state, _optional_state>
+            _state;
+
+        static constexpr exy::continuation _restart(exy::ctx_base& ctx) noexcept
+        {
+            op& self = Cont::get_op(ctx);
+            _r& f    = Cont::get_future(ctx);
             try
             {
-                if constexpr (std::same_as<state, _simple_state>)
+                if constexpr (std::same_as<decltype(_state), _simple_state>)
                 {
-                    self._future = f._base;
-                    self._state  = {};
+                    self._state.future = f._base;
+                    self._state.op     = {};
+                    return &self._state.op.start;
                 }
                 else
                 {
-                    self._impl.emplace(f._base);
+                    self._state.impl.emplace(f._base);
+                    return &self._state.impl->op.start;
                 }
-                return &Base::template op<_c>::start;
             }
             catch (...)
             {
-                return exy::set_exception<signatures, Cont>(Cont::get_result_storage(s));
+                return exy::set_exception<signatures, Cont>(Cont::get_result_storage(ctx));
             }
         }
 
         struct _c : exy::adapter_continuation<_c, Cont>
         {
-            static constexpr Base& get_future(exy::state_base& s) noexcept
+            static constexpr Base& get_future(exy::ctx_base& ctx) noexcept
             {
-                if constexpr (std::same_as<state, _simple_state>)
-                    return Cont::get_state(s)._future;
+                if constexpr (std::same_as<decltype(_state), _simple_state>)
+                    return Cont::get_op(ctx)._state.future;
                 else
-                    return Cont::get_state(s)._impl->future;
+                    return Cont::get_op(ctx)._state.impl->future;
             }
-            static constexpr exy::state_of<Base>& get_state(exy::state_base& s) noexcept
+            static constexpr exy::op_of<Base, _c>& get_op(exy::ctx_base& ctx) noexcept
             {
-                if constexpr (std::same_as<state, _simple_state>)
-                    return Cont::get_state(s)._state;
+                if constexpr (std::same_as<decltype(_state), _simple_state>)
+                    return Cont::get_op(ctx)._state.op;
                 else
-                    return Cont::get_state(s)._impl->state;
+                    return Cont::get_op(ctx)._state.impl->op;
             }
 
             template <exy::signature_with_tag<exy::value_tag> S>
-            static constexpr exy::continuation continuation_for(exy::state_base& s) noexcept
+            static constexpr exy::continuation continuation_for(exy::ctx_base& ctx) noexcept
             {
-                exy::storage_ref result = Cont::get_result_storage(s);
+                exy::storage_ref result = Cont::get_result_storage(ctx);
                 (void)result.get<S>(); // destroy
 
-                if (exy::query_or_default<Cont>(queries::stop_requested, s))
+                if (exy::query_or_default<Cont>(queries::stop_requested, ctx))
                     return exy::set<signatures, Cont, exy::stopped_tag()>(result);
                 else
-                    return _restart(s);
+                    return _restart(ctx);
             }
         };
 
-        static constexpr void* start(exy::state_base& s)
+        static constexpr void* start(exy::ctx_base& ctx)
         {
-            EXY_TAIL_CALL _restart(s)(s);
+            EXY_TAIL_CALL _restart(ctx)(ctx);
         }
     };
 };

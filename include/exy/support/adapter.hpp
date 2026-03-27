@@ -39,37 +39,33 @@ namespace exy
 template <typename Derived, typename Cont>
 struct adapter_continuation
 {
-    static constexpr exy::storage_ref get_result_storage(exy::state_base& s)
+    static constexpr exy::storage_ref get_result_storage(exy::ctx_base& ctx)
     {
-        EXY_TAIL_CALL Cont::get_result_storage(s);
-    }
-    static constexpr auto& get_state(exy::state_base& s) noexcept
-    {
-        return Cont::get_state(s);
+        EXY_TAIL_CALL Cont::get_result_storage(ctx);
     }
 
-    static constexpr auto query(exy::query auto q, exy::state_base& s)
+    static constexpr auto query(exy::query auto q, exy::ctx_base& ctx)
     {
-        if constexpr (requires { Derived::override_query(q, s); })
-            EXY_TAIL_CALL Derived::override_query(q, s);
+        if constexpr (requires { Derived::override_query(q, ctx); })
+            EXY_TAIL_CALL Derived::override_query(q, ctx);
         else
-            EXY_TAIL_CALL Cont::query(q, s);
+            EXY_TAIL_CALL Cont::query(q, ctx);
     }
 
     template <typename S>
-    static constexpr void* call(exy::state_base& s)
+    static constexpr void* call(exy::ctx_base& ctx)
     {
-        if constexpr (requires { Derived::template continuation_for<S>(s); })
+        if constexpr (requires { Derived::template continuation_for<S>(ctx); })
         {
-            auto cont = Derived::template continuation_for<S>(s);
+            auto cont = Derived::template continuation_for<S>(ctx);
             if (cont)
-                EXY_TAIL_CALL cont(s);
+                EXY_TAIL_CALL cont(ctx);
             else
                 return nullptr;
         }
         else
         {
-            return Cont::template call<S>(s);
+            return Cont::template call<S>(ctx);
         }
     }
 };

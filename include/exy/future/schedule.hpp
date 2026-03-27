@@ -42,18 +42,6 @@ struct _co : exy::future_base
     using signatures = _::mp_unique<_::mp_append<
         exy::signatures_of<Base>, _::mp_filter<exy::error_tag::is, exy::signatures_of<SchF>>>>;
 
-    struct state : exy::state_base
-    {
-        using sch_result_t = exy::storage<exy::storage_spec::get(exy::signatures_of<SchF>())>;
-        using cont_t       = std::conditional_t<
-            _::mp_size<_base_values>::value <= 1, exy::state_base, exy::continuation>;
-
-        EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _base;
-        EXY_NO_UNIQUE_ADDRESS exy::state_of<SchF> _sch;
-        EXY_NO_UNIQUE_ADDRESS sch_result_t        _sch_result;
-        EXY_NO_UNIQUE_ADDRESS cont_t              _cont;
-    };
-
     static consteval auto storage_spec() noexcept
     {
         // Note: we don't need the _sch_future::storage_spec; it lives in the state.
@@ -65,44 +53,44 @@ struct _co : exy::future_base
     {
         struct _cpost
         {
-            static constexpr SchF& get_future(exy::state_base& s) noexcept
+            static constexpr SchF& get_future(exy::ctx_base& ctx) noexcept
             {
-                return Cont::get_future(s)._sch;
+                return Cont::get_future(ctx)._sch;
             }
-            static constexpr exy::state_of<SchF>& get_state(exy::state_base& s) noexcept
+            static constexpr exy::op_of<SchF, _cpost>& get_op(exy::ctx_base& ctx) noexcept
             {
-                return Cont::get_state(s)._sch;
+                return Cont::get_op(ctx)._sch;
             }
-            static constexpr exy::storage_ref get_result_storage(exy::state_base& s) noexcept
+            static constexpr exy::storage_ref get_result_storage(exy::ctx_base& ctx) noexcept
             {
-                return exy::storage_ref(Cont::get_state(s)._sch_result);
+                return exy::storage_ref(Cont::get_op(ctx)._sch_result);
             }
 
             template <std::same_as<exy::value_tag()> S>
-            static constexpr void* call(exy::state_base& s)
+            static constexpr void* call(exy::ctx_base& ctx)
             {
-                state& self = Cont::get_state(s);
+                op& self = Cont::get_op(ctx);
 
-                exy::storage_ref sch_result = get_result_storage(s);
+                exy::storage_ref sch_result = get_result_storage(ctx);
                 (void)sch_result.template get<S>();
 
                 // Continue with the correct result.
                 if constexpr (_::mp_size<_base_values>::value == 0)
                     exy_assert(false);
                 else if constexpr (_::mp_size<_base_values>::value == 1)
-                    EXY_TAIL_CALL Cont::template call<_::mp_only<_base_values>>(s);
+                    EXY_TAIL_CALL Cont::template call<_::mp_only<_base_values>>(ctx);
                 else
-                    EXY_TAIL_CALL self._cont(s);
+                    EXY_TAIL_CALL self._cont(ctx);
             }
 
             template <exy::signature_with_tag<exy::error_tag> S>
-            static constexpr void* call(exy::state_base& s)
+            static constexpr void* call(exy::ctx_base& ctx)
             {
-                state& self = Cont::get_state(s);
+                op& self = Cont::get_op(ctx);
 
                 // Scheduling failed, destroy the previous result, and continue with the error.
                 {
-                    exy::storage_ref result = Cont::get_result_storage(s);
+                    exy::storage_ref result = Cont::get_result_storage(ctx);
                     if constexpr (_::mp_size<_base_values>::value == 1)
                     {
                         (void)result.template get<_::mp_only<_base_values>>();
@@ -119,40 +107,50 @@ struct _co : exy::future_base
                         }(_base_values{});
                     }
 
-                    exy::storage_ref sch_result = get_result_storage(s);
+                    exy::storage_ref sch_result = get_result_storage(ctx);
                     auto [... args]             = sch_result.get<S>();
                     result.template emplace<S>(exy_mov(args)...);
                 }
 
-                EXY_TAIL_CALL Cont::template call<S>(s);
+                EXY_TAIL_CALL Cont::template call<S>(ctx);
             }
         };
 
         struct _cpre : exy::adapter_continuation<_cpre, Cont>
         {
-            static constexpr Base& get_future(exy::state_base& s) noexcept
+            static constexpr Base& get_future(exy::ctx_base& ctx) noexcept
             {
-                return Cont::get_future(s)._base;
+                return Cont::get_future(ctx)._base;
             }
-            static constexpr exy::state_of<Base>& get_state(exy::state_base& s) noexcept
+            static constexpr exy::op_of<Base, _cpre>& get_op(exy::ctx_base& ctx) noexcept
             {
-                return Cont::get_state(s)._base;
+                return Cont::get_op(ctx)._base;
             }
 
             template <exy::signature_with_tag<exy::value_tag> S>
-            static constexpr exy::continuation continuation_for(exy::state_base& s) noexcept
+            static constexpr exy::continuation continuation_for(exy::ctx_base& ctx) noexcept
             {
-                state& self = Cont::get_state(s);
+                op& self = Cont::get_op(ctx);
                 if constexpr (_::mp_size<_base_values>::value > 1)
                     self._cont = &Cont::template call<S>;
 
-                return &SchF::template op<_cpost>::start;
+                return &self._sch.start;
             }
         };
 
-        static constexpr void* start(exy::state_base& s)
+        using sch_result_t = exy::storage<exy::storage_spec::get(exy::signatures_of<SchF>())>;
+        using cont_t       = std::conditional_t<
+            _::mp_size<_base_values>::value <= 1, exy::ctx_base, exy::continuation>;
+
+        EXY_NO_UNIQUE_ADDRESS exy::op_of<Base, _cpre> _base;
+        EXY_NO_UNIQUE_ADDRESS exy::op_of<SchF, _cpost> _sch;
+        EXY_NO_UNIQUE_ADDRESS sch_result_t             _sch_result;
+        EXY_NO_UNIQUE_ADDRESS cont_t                   _cont;
+
+        static constexpr void* start(exy::ctx_base& ctx)
         {
-            EXY_TAIL_CALL Base::template op<_cpre>::start(s);
+            op&           self = Cont::get_op(ctx);
+            EXY_TAIL_CALL self._base.start(ctx);
         }
     };
 };

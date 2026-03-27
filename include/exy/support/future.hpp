@@ -22,13 +22,13 @@ using is_future = std::bool_constant<future<T>>;
 
 template <typename F>
 using signatures_of = typename F::signatures;
-template <typename F>
-using state_of = typename F::state;
+template <typename F, typename Cont>
+using op_of = typename F::template op<Cont>;
 
-struct state_base
+struct ctx_base
 {};
 
-using continuation = void* (*)(exy::state_base&);
+using continuation = void* (*)(exy::ctx_base&);
 
 template <typename Signatures, typename Cont, typename S>
 constexpr auto set(exy::storage_ref result, auto&&... args) -> continuation

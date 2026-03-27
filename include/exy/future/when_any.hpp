@@ -23,14 +23,6 @@ struct _wany : exy::future_base
             _combined_signatures, exy::any_tag,
             _::mp_compose<exy::pack, std::is_nothrow_move_constructible>>>;
 
-    struct state : exy::state_base
-    {
-        EXY_NO_UNIQUE_ADDRESS exy::pack<exy::state_of<F>...> _base;
-        exy::pack<exy::storage<F::storage_spec()>...>        _storage;
-        std::atomic<unsigned>                                _done = 0;
-        exy::continuation                                    _continuation;
-    };
-
     static consteval auto storage_spec() noexcept
     {
         // Intermediate storage lives in state.
@@ -43,42 +35,40 @@ struct _wany : exy::future_base
         template <std::size_t Idx>
         struct _c : exy::adapter_continuation<_c<Idx>, Cont>
         {
-            static constexpr auto& get_future(exy::state_base& s) noexcept
+            static constexpr auto& get_future(exy::ctx_base& ctx) noexcept
             {
-                return std::get<Idx>(Cont::get_future(s)._base);
+                return std::get<Idx>(Cont::get_future(ctx)._base);
             }
-            static constexpr auto& get_state(exy::state_base& s) noexcept
+            static constexpr auto& get_op(exy::ctx_base& ctx) noexcept
             {
-                return std::get<Idx>(Cont::get_state(s)._base);
+                return std::get<Idx>(Cont::get_op(ctx)._base);
             }
-            static constexpr exy::storage_ref get_result_storage(exy::state_base& s) noexcept
+            static constexpr exy::storage_ref get_result_storage(exy::ctx_base& ctx) noexcept
             {
-                return exy::storage_ref(std::get<Idx>(Cont::get_state(s)._storage));
+                return exy::storage_ref(std::get<Idx>(Cont::get_op(ctx)._storage));
             }
 
             static constexpr bool override_query(
-                exy::queries::stop_requested_t q, exy::state_base& s
+                exy::queries::stop_requested_t q, exy::ctx_base& ctx
             )
             {
-                state& self = Cont::get_state(s);
+                op& self = Cont::get_op(ctx);
                 if (self._done.load(std::memory_order_relaxed) > 0)
                     return true;
 
-                if constexpr (
-                    exy::has_query<Cont, exy::queries::stop_requested_t, exy::state_base&>
-                )
-                    EXY_TAIL_CALL Cont::query(q, s);
+                if constexpr (exy::has_query<Cont, exy::queries::stop_requested_t, exy::ctx_base&>)
+                    EXY_TAIL_CALL Cont::query(q, ctx);
                 else
                     return false;
             }
 
             template <typename S>
-            static constexpr exy::continuation continuation_for(exy::state_base& s) noexcept
+            static constexpr exy::continuation continuation_for(exy::ctx_base& ctx) noexcept
             {
-                state&           self   = Cont::get_state(s);
-                exy::storage_ref result = Cont::get_result_storage(s);
+                op&              self   = Cont::get_op(ctx);
+                exy::storage_ref result = Cont::get_result_storage(ctx);
 
-                exy::storage_ref base_result = get_result_storage(s);
+                exy::storage_ref base_result = get_result_storage(ctx);
                 auto [... args]              = base_result.get<S>();
 
                 auto prev_count = self._done.fetch_add(1, std::memory_order_acq_rel);
@@ -97,16 +87,29 @@ struct _wany : exy::future_base
             }
         };
 
-        static constexpr void* start(exy::state_base& s)
+        template <typename Idxs>
+        struct _make_op_pack;
+        template <std::size_t... Idx>
+        struct _make_op_pack<std::index_sequence<Idx...>>
         {
-            state& self = Cont::get_state(s);
+            using type = exy::pack<exy::op_of<F, _c<Idx>>...>;
+        };
+
+        EXY_NO_UNIQUE_ADDRESS _make_op_pack<std::index_sequence_for<F...>>::type _base;
+        EXY_NO_UNIQUE_ADDRESS exy::pack<exy::storage<F::storage_spec()>...> _storage;
+        std::atomic<unsigned>                                               _done = 0;
+        exy::continuation                                                   _continuation;
+
+        static constexpr void* start(exy::ctx_base& ctx)
+        {
+            op& self = Cont::get_op(ctx);
 
             [&]<typename... FI, std::size_t... Idx>(
                 _::mp_list<FI...>, std::index_sequence<Idx...>
             ) {
-                (FI::template op<_c<Idx>>::start(s), ...);
+                (FI::template op<_c<Idx>>::start(ctx), ...);
             }(_::mp_pop_back<_::mp_list<F...>>{}, std::make_index_sequence<sizeof...(F) - 1>{});
-            EXY_TAIL_CALL F...[sizeof...(F) - 1] ::template op<_c<sizeof...(F) - 1>>::start(s);
+            EXY_TAIL_CALL F...[sizeof...(F) - 1] ::template op<_c<sizeof...(F) - 1>>::start(ctx);
         }
     };
 };

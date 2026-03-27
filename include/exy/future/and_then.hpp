@@ -37,17 +37,6 @@ struct _at : exy::future_base
         exy::signatures_all_of_tag<
             exy::signatures_of<Base>, Tag, _::mp_bind_front<exy::is_nothrow_invocable, Fn>>>;
 
-    struct state : exy::state_base
-    {
-        _::mp_apply<std::variant, _::mp_set_push_front<_fn_result_types, std::monostate>>
-            _sub_future;
-        _::mp_apply<
-            std::variant,
-            _::mp_set_push_front<
-                _::mp_transform<exy::state_of, _fn_result_types>, exy::state_of<Base>>>
-            _sub_state;
-    };
-
     static consteval auto storage_spec() noexcept
     {
         auto result = exy::max(Base::storage_spec(), exy::storage_spec::get(signatures()));
@@ -65,45 +54,47 @@ struct _at : exy::future_base
         template <typename Sub>
         struct _cs : Cont
         {
-            static constexpr Sub& get_future(exy::state_base& s) noexcept
+            static constexpr Sub& get_future(exy::ctx_base& ctx) noexcept
             {
-                return std::get<Sub>(Cont::get_state(s)._sub_future);
+                return std::get<Sub>(Cont::get_op(ctx)._sub_future);
             }
-            static constexpr exy::state_of<Sub>& get_state(exy::state_base& s) noexcept
+            static constexpr exy::op_of<Sub, _cs>& get_op(exy::ctx_base& ctx) noexcept
             {
-                return std::get<exy::state_of<Sub>>(Cont::get_state(s)._sub_state);
+                return std::get<exy::op_of<Sub, _cs>>(Cont::get_op(ctx)._sub_op);
             }
         };
+        template <typename Sub>
+        using _sub_op_of = exy::op_of<Sub, _cs<Sub>>;
 
         struct _cb : exy::adapter_continuation<_cb, Cont>
         {
-            static constexpr Base& get_future(exy::state_base& s) noexcept
+            static constexpr Base& get_future(exy::ctx_base& ctx) noexcept
             {
-                return Cont::get_future(s)._base;
+                return Cont::get_future(ctx)._base;
             }
-            static constexpr exy::state_of<Base>& get_state(exy::state_base& s) noexcept
+            static constexpr exy::op_of<Base, _cb>& get_op(exy::ctx_base& ctx) noexcept
             {
-                return std::get<exy::state_of<Base>>(Cont::get_state(s)._sub_state);
+                return std::get<exy::op_of<Base, _cb>>(Cont::get_op(ctx)._sub_op);
             }
 
             template <exy::signature_with_tag<Tag> S>
-            static constexpr exy::continuation continuation_for(exy::state_base& s) noexcept
+            static constexpr exy::continuation continuation_for(exy::ctx_base& ctx) noexcept
             {
-                _at&             self   = Cont::get_future(s);
-                state&           state  = Cont::get_state(s);
-                exy::storage_ref result = Cont::get_result_storage(s);
+                op&              op     = Cont::get_op(ctx);
+                _at&             f      = Cont::get_future(ctx);
+                exy::storage_ref result = Cont::get_result_storage(ctx);
 
                 try
                 {
                     auto [... args] = result.get<S>();
 
                     using sub_t = exy::invoke_result_t<Fn, decltype(args)...>;
-                    state._sub_future.template emplace<sub_t>(
-                        exy_invoke(exy_mov(self)._fn, exy_mov(args)...)
+                    op._sub_future.template emplace<sub_t>(
+                        exy_invoke(exy_mov(f)._fn, exy_mov(args)...)
                     );
-                    state._sub_state.template emplace<exy::state_of<sub_t>>();
+                    auto& sub_op = op._sub_op.template emplace<exy::op_of<sub_t, _cs<sub_t>>>();
 
-                    return &sub_t::template op<_cs<sub_t>>::start;
+                    return &sub_op.start;
                 }
                 catch (...)
                 {
@@ -112,9 +103,18 @@ struct _at : exy::future_base
             }
         };
 
-        static constexpr void* start(exy::state_base& s)
+        _::mp_apply<std::variant, _::mp_set_push_front<_fn_result_types, std::monostate>>
+            _sub_future;
+        _::mp_apply<
+            std::variant, _::mp_set_push_front<
+                              _::mp_transform<_sub_op_of, _fn_result_types>, exy::op_of<Base, _cb>>>
+            _sub_op;
+
+        static constexpr void* start(exy::ctx_base& ctx)
         {
-            EXY_TAIL_CALL Base::template op<_cb>::start(s);
+            op&           self    = Cont::get_op(ctx);
+            auto&         base_op = self._sub_op.template emplace<exy::op_of<Base, _cb>>();
+            EXY_TAIL_CALL base_op.start(ctx);
         }
     };
 };

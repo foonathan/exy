@@ -20,80 +20,76 @@ inline constexpr struct sync_wait_t
         _::mp_quote<std::tuple>>>;
 
     template <typename F>
-    struct _state : exy::state_base
+    struct _c : exy::ctx_base
     {
         F&                              _f;
-        exy::state_of<F>                _s;
+        exy::op_of<F, _c>               _op;
         std::exception_ptr              _ex   = {};
         std::atomic<bool>               _done = false;
         exy::storage<F::storage_spec()> _result;
 
-        constexpr explicit _state(F& f) noexcept : _f(f) {}
+        constexpr explicit _c(F& f) noexcept : _f(f) {}
 
-        void complete() noexcept
+        void _complete() noexcept
         {
             _done.store(true, std::memory_order_release);
             _done.notify_one();
         }
-    };
 
-    template <typename F>
-    struct _c
-    {
-        static constexpr F& get_future(exy::state_base& s) noexcept
+        static constexpr F& get_future(exy::ctx_base& ctx) noexcept
         {
-            return static_cast<_state<F>&>(s)._f;
+            return static_cast<_c&>(ctx)._f;
         }
-        static constexpr exy::state_of<F>& get_state(exy::state_base& s) noexcept
+        static constexpr exy::op_of<F, _c>& get_op(exy::ctx_base& ctx) noexcept
         {
-            return static_cast<_state<F>&>(s)._s;
+            return static_cast<_c&>(ctx)._op;
         }
-        static constexpr exy::storage_ref get_result_storage(exy::state_base& s) noexcept
+        static constexpr exy::storage_ref get_result_storage(exy::ctx_base& ctx) noexcept
         {
-            return exy::storage_ref(static_cast<_state<F>&>(s)._result);
+            return exy::storage_ref(static_cast<_c&>(ctx)._result);
         }
 
-        static constexpr auto query(exy::query auto, exy::state_base&) noexcept
+        static constexpr auto query(exy::query auto, exy::ctx_base&) noexcept
         {
             return exy::no_such_query{};
         }
 
         template <exy::signature_with_tag<exy::value_tag> S>
-        static constexpr void* call(exy::state_base& s)
+        static constexpr void* call(exy::ctx_base& ctx)
         {
-            auto& self   = static_cast<_state<F>&>(s);
-            auto  result = get_result_storage(s);
+            auto& self   = static_cast<_c&>(ctx);
+            auto  result = get_result_storage(ctx);
 
             auto [... args] = result.get<S>();
             result.emplace_raw<_value_type<F>>(std::in_place, exy_mov(args)...);
 
-            self.complete();
+            self._complete();
             return nullptr;
         }
 
         template <exy::signature_with_tag<exy::error_tag> S>
-        static constexpr void* call(exy::state_base& s)
+        static constexpr void* call(exy::ctx_base& ctx)
         {
-            auto& self   = static_cast<_state<F>&>(s);
-            auto  result = get_result_storage(s);
+            auto& self   = static_cast<_c&>(ctx);
+            auto  result = get_result_storage(ctx);
 
             auto [ex] = result.get<S>();
             self._ex  = ex;
 
-            self.complete();
+            self._complete();
             return nullptr;
         }
 
         template <exy::signature_with_tag<exy::stopped_tag> S>
-        static constexpr void* call(exy::state_base& s)
+        static constexpr void* call(exy::ctx_base& ctx)
         {
-            auto& self   = static_cast<_state<F>&>(s);
-            auto  result = get_result_storage(s);
+            auto& self   = static_cast<_c&>(ctx);
+            auto  result = get_result_storage(ctx);
 
             (void)result.get<S>();
             result.emplace_raw<_value_type<F>>(std::nullopt);
 
-            self.complete();
+            self._complete();
             return nullptr;
         }
     };
@@ -104,14 +100,13 @@ inline constexpr struct sync_wait_t
         !_::mp_set_contains<S, exy::error_tag(std::exception_ptr)>::value
     )
     {
-        _state<F> state(f);
+        _c<F> ctx(f);
+        ctx._op.start(ctx);
+        ctx._done.wait(false, std::memory_order_acquire);
 
-        F::template op<_c<F>>::start(state);
-        state._done.wait(false, std::memory_order_acquire);
-
-        if (state._ex)
-            std::rethrow_exception(state._ex);
-        return exy::storage_ref(state._result).get_raw<_value_type<F>>();
+        if (ctx._ex)
+            std::rethrow_exception(ctx._ex);
+        return exy::storage_ref(ctx._result).get_raw<_value_type<F>>();
     }
 } sync_wait;
 } // namespace exy

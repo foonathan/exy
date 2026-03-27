@@ -16,8 +16,6 @@ struct _f : exy::future_base
     using signatures = exy::signatures_insert_exception<
         exy::signatures<Tag(Ts...)>, (std::is_nothrow_move_constructible_v<Ts> && ...)>;
 
-    using state = exy::state_base;
-
     static consteval auto storage_spec() noexcept
     {
         return exy::storage_spec::get(signatures());
@@ -26,10 +24,10 @@ struct _f : exy::future_base
     template <typename Cont>
     struct op
     {
-        static constexpr void* start(exy::state_base& s)
+        static constexpr void* start(exy::ctx_base& ctx)
         {
-            _f&              self   = Cont::get_future(s);
-            exy::storage_ref result = Cont::get_result_storage(s);
+            _f&              self   = Cont::get_future(ctx);
+            exy::storage_ref result = Cont::get_result_storage(ctx);
 
             auto cont = [&] {
                 try
@@ -42,7 +40,7 @@ struct _f : exy::future_base
                     return exy::set_exception<signatures, Cont>(result);
                 }
             }();
-            EXY_TAIL_CALL cont(s);
+            EXY_TAIL_CALL cont(ctx);
         }
     };
 };

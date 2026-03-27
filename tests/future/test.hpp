@@ -138,43 +138,39 @@ inline constexpr struct test_run_t
     }
 
     template <typename Env, typename F>
-    struct _state : exy::state_base
+    struct _c : exy::ctx_base
     {
         const Env&                       _env;
         F&                               _f;
-        exy::state_of<F>                 _s;
+        exy::op_of<F, _c>                _op;
         std::atomic<bool>                _done = false;
         exy::storage<_storage_spec<F>()> _result;
 
-        constexpr explicit _state(const Env& env, F& f) noexcept : _env(env), _f(f) {}
-    };
+        constexpr explicit _c(const Env& env, F& f) noexcept : _env(env), _f(f) {}
 
-    template <typename Env, typename F>
-    struct _c
-    {
-        static constexpr F& get_future(exy::state_base& s) noexcept
+        static constexpr F& get_future(exy::ctx_base& ctx) noexcept
         {
-            return static_cast<_state<Env, F>&>(s)._f;
+            return static_cast<_c&>(ctx)._f;
         }
-        static constexpr exy::state_of<F>& get_state(exy::state_base& s) noexcept
+        static constexpr exy::op_of<F, _c>& get_op(exy::ctx_base& ctx) noexcept
         {
-            return static_cast<_state<Env, F>&>(s)._s;
+            return static_cast<_c&>(ctx)._op;
         }
-        static constexpr exy::storage_ref get_result_storage(exy::state_base& s) noexcept
+        static constexpr exy::storage_ref get_result_storage(exy::ctx_base& ctx) noexcept
         {
-            return exy::storage_ref(static_cast<_state<Env, F>&>(s)._result);
+            return exy::storage_ref(static_cast<_c&>(ctx)._result);
         }
 
-        static constexpr auto query(exy::query auto q, exy::state_base& s) noexcept
+        static constexpr auto query(exy::query auto q, exy::ctx_base& ctx) noexcept
         {
-            return static_cast<_state<Env, F>&>(s)._env.query(q);
+            return static_cast<_c&>(ctx)._env.query(q);
         }
 
         template <typename S>
-        static constexpr void* call(exy::state_base& s)
+        static constexpr void* call(exy::ctx_base& ctx)
         {
-            auto& self   = static_cast<_state<Env, F>&>(s);
-            auto  result = get_result_storage(s);
+            auto& self   = static_cast<_c&>(ctx);
+            auto  result = get_result_storage(ctx);
 
             auto [... args] = result.get<S>();
             result.emplace_raw<test_result>(
@@ -191,12 +187,12 @@ inline constexpr struct test_run_t
     template <typename Env, exy::future F>
     static constexpr test_result operator()(const Env& env, F&& f)
     {
-        _state state(env, f);
+        _c ctx(env, f);
 
-        F::template op<_c<Env, F>>::start(state);
-        state._done.wait(false, std::memory_order_acquire);
+        ctx._op.start(ctx);
+        ctx._done.wait(false, std::memory_order_acquire);
 
-        return exy::storage_ref(state._result).get_raw<test_result>();
+        return exy::storage_ref(ctx._result).get_raw<test_result>();
     }
 } test_run;
 

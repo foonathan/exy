@@ -12,42 +12,38 @@ namespace exy
 inline constexpr struct detach_t
 {
     template <typename F>
-    struct _state : exy::state_base
+    struct _c : exy::ctx_base
     {
         F                               _f;
-        exy::state_of<F>                _s;
+        exy::op_of<F, _c>               _op;
         exy::storage<F::storage_spec()> _result;
 
-        constexpr explicit _state(F&& f) noexcept(std::is_nothrow_move_constructible_v<F>)
+        constexpr explicit _c(F&& f) noexcept(std::is_nothrow_move_constructible_v<F>)
         : _f(exy_mov(f))
         {}
-    };
 
-    template <typename F>
-    struct _c
-    {
-        static constexpr F& get_future(exy::state_base& s) noexcept
+        static constexpr F& get_future(exy::ctx_base& ctx) noexcept
         {
-            return static_cast<_state<F>&>(s)._f;
+            return static_cast<_c&>(ctx)._f;
         }
-        static constexpr exy::state_of<F>& get_state(exy::state_base& s) noexcept
+        static constexpr exy::op_of<F, _c>& get_op(exy::ctx_base& ctx) noexcept
         {
-            return static_cast<_state<F>&>(s)._s;
+            return static_cast<_c<F>&>(ctx)._op;
         }
-        static constexpr exy::storage_ref get_result_storage(exy::state_base& s) noexcept
+        static constexpr exy::storage_ref get_result_storage(exy::ctx_base& ctx) noexcept
         {
-            return exy::storage_ref(static_cast<_state<F>&>(s)._result);
+            return exy::storage_ref(static_cast<_c&>(ctx)._result);
         }
 
-        static constexpr auto query(exy::query auto, exy::state_base&) noexcept
+        static constexpr auto query(exy::query auto, exy::ctx_base&) noexcept
         {
             return exy::no_such_query{};
         }
 
         template <typename S>
-        static constexpr void* call(exy::state_base& s)
+        static constexpr void* call(exy::ctx_base& ctx)
         {
-            auto self = static_cast<_state<F>*>(&s);
+            auto self = static_cast<_c*>(&ctx);
             (void)exy::storage_ref(self->_result).get<S>(); // destroy
             if constexpr (exy::signature_with_tag<S, exy::error_tag>)
                 std::terminate(); // unhandled exception
@@ -61,8 +57,8 @@ inline constexpr struct detach_t
         requires exy::void_value_signature<S>
     static constexpr void operator()(F&& f)
     {
-        auto state = new _state(exy_mov(f));
-        F::template op<_c<F>>::start(*state);
+        auto ctx = new _c(exy_mov(f));
+        ctx->_op.start(*ctx);
     }
 } detach;
 } // namespace exy
