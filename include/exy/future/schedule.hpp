@@ -37,15 +37,21 @@ struct _co : exy::future_base
     EXY_NO_UNIQUE_ADDRESS Base _base;
     EXY_NO_UNIQUE_ADDRESS SchF _sch;
 
+    using _base_values = _::mp_filter<exy::value_tag::is, exy::signatures_of<Base>>;
+
     using signatures = _::mp_unique<_::mp_append<
         exy::signatures_of<Base>, _::mp_filter<exy::error_tag::is, exy::signatures_of<SchF>>>>;
 
     struct state : exy::state_base
     {
+        using sch_result_t = exy::storage<exy::storage_spec::get(exy::signatures_of<SchF>())>;
+        using cont_t       = std::conditional_t<
+            _::mp_size<_base_values>::value <= 1, exy::state_base, exy::continuation>;
+
         EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _base;
         EXY_NO_UNIQUE_ADDRESS exy::state_of<SchF> _sch;
-        EXY_NO_UNIQUE_ADDRESS exy::storage<exy::storage_spec::get(exy::signatures_of<SchF>())>
-                              _sch_result;
+        EXY_NO_UNIQUE_ADDRESS sch_result_t        _sch_result;
+        EXY_NO_UNIQUE_ADDRESS cont_t              _cont;
     };
 
     static consteval auto storage_spec() noexcept
@@ -57,7 +63,6 @@ struct _co : exy::future_base
     template <typename Cont>
     struct op
     {
-        template <typename PrevS>
         struct _cpost
         {
             static constexpr SchF& get_future(exy::state_base& s) noexcept
@@ -82,7 +87,12 @@ struct _co : exy::future_base
                 (void)sch_result.template get<S>();
 
                 // Continue with the correct result.
-                EXY_TAIL_CALL Cont::template call<PrevS>(s);
+                if constexpr (_::mp_size<_base_values>::value == 0)
+                    exy_assert(false);
+                else if constexpr (_::mp_size<_base_values>::value == 1)
+                    EXY_TAIL_CALL Cont::template call<_::mp_only<_base_values>>(s);
+                else
+                    EXY_TAIL_CALL self._cont(s);
             }
 
             template <exy::signature_with_tag<exy::error_tag> S>
@@ -93,7 +103,21 @@ struct _co : exy::future_base
                 // Scheduling failed, destroy the previous result, and continue with the error.
                 {
                     exy::storage_ref result = Cont::get_result_storage(s);
-                    (void)result.template get<PrevS>();
+                    if constexpr (_::mp_size<_base_values>::value == 1)
+                    {
+                        (void)result.template get<_::mp_only<_base_values>>();
+                    }
+                    else if constexpr (_::mp_size<_base_values>::value > 1)
+                    {
+                        [&]<typename... PrevS>(exy::signatures<PrevS...>) {
+                            auto matched
+                                = ((self._cont == &Cont::template call<PrevS>
+                                    ? (void)result.template get<PrevS>(),
+                                    true : false)
+                                   || ...);
+                            exy_assert(matched);
+                        }(_base_values{});
+                    }
 
                     exy::storage_ref sch_result = get_result_storage(s);
                     auto [... args]             = sch_result.get<S>();
@@ -116,9 +140,13 @@ struct _co : exy::future_base
             }
 
             template <exy::signature_with_tag<exy::value_tag> S>
-            static constexpr exy::continuation continuation_for(exy::state_base&) noexcept
+            static constexpr exy::continuation continuation_for(exy::state_base& s) noexcept
             {
-                return &SchF::template op<_cpost<S>>::start;
+                state& self = Cont::get_state(s);
+                if constexpr (_::mp_size<_base_values>::value > 1)
+                    self._cont = &Cont::template call<S>;
+
+                return &SchF::template op<_cpost>::start;
             }
         };
 

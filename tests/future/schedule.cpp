@@ -81,6 +81,14 @@ TEST_CASE("continues_on", "[futures]")
     REQUIRE_SIGNATURES(binary_value, exy::value_tag(int, int), exy::error_tag(std::exception_ptr));
     CHECK_FUTURE(binary_value, thread_change, exy::value_tag(), 11, 42);
 
+    auto multiple_values
+        = with_signature<exy::value_tag(short)>(exyf::value(11)) | exyf::continues_on(background);
+    REQUIRE_SIGNATURES(
+        multiple_values, exy::value_tag(int), exy::value_tag(short),
+        exy::error_tag(std::exception_ptr)
+    );
+    CHECK_FUTURE(multiple_values, thread_change, exy::value_tag(), 11);
+
     auto error = exyf::error(0) | exyf::continues_on(background);
     REQUIRE_SIGNATURES(error, exy::error_tag(int), exy::error_tag(std::exception_ptr));
     CHECK_FUTURE(error, no_thread_change, exy::error_tag(), 0);
