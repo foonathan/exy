@@ -18,6 +18,9 @@ struct storage_spec
     template <typename Tag, typename... T>
     static consteval storage_spec get(std::type_identity<Tag(T...)>) noexcept
     {
+        if constexpr (sizeof...(T) == 0)
+            return {0, 1};
+
         using pack = exy::pack<T...>;
         return {sizeof(pack), alignof(pack)};
     }
@@ -47,7 +50,12 @@ public:
     storage& operator=(const storage&) = delete;
 
 private:
-    alignas(Spec.alignment) unsigned char _buffer[Spec.size];
+    struct empty
+    {};
+
+    alignas(
+        Spec.alignment
+    ) std::conditional_t<Spec.size == 0, empty, unsigned char[Spec.size]> _buffer;
     friend class storage_ref;
 };
 

@@ -43,8 +43,9 @@ struct _co : exy::future_base
     struct state : exy::state_base
     {
         EXY_NO_UNIQUE_ADDRESS exy::state_of<Base> _base;
-        EXY_NO_UNIQUE_ADDRESS exy::state_of<SchF>                        _sch;
-        exy::storage<exy::storage_spec::get(exy::signatures_of<SchF>())> _sch_result;
+        EXY_NO_UNIQUE_ADDRESS exy::state_of<SchF> _sch;
+        EXY_NO_UNIQUE_ADDRESS exy::storage<exy::storage_spec::get(exy::signatures_of<SchF>())>
+                              _sch_result;
     };
 
     static consteval auto storage_spec() noexcept
@@ -76,6 +77,9 @@ struct _co : exy::future_base
             static constexpr void* call(exy::state_base& s)
             {
                 state& self = Cont::get_state(s);
+
+                exy::storage_ref sch_result = get_result_storage(s);
+                (void)sch_result.template get<S>();
 
                 // Continue with the correct result.
                 EXY_TAIL_CALL Cont::template call<PrevS>(s);
