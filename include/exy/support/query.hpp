@@ -28,6 +28,14 @@ using query_result_t = decltype(Env::query(std::declval<Q>(), std::declval<Args.
 template <typename Env, typename Q, typename... Args>
 concept has_query = query<Q> && !std::same_as<query_result_t<Env, Q, Args...>, no_such_query>;
 
+template <typename Q>
+using query_default_value_t = decltype(std::declval<Q>().default_value());
+
+template <typename Env, typename Q, typename... Args>
+using query_or_default_result_t = typename std::conditional_t<
+    has_query<Env, Q, Args...>, _::mp_defer<query_result_t, Env, Q, Args...>,
+    _::mp_defer<query_default_value_t, Q>>::type;
+
 template <typename Env>
 constexpr auto query_or_default(query auto q, auto&&... args) noexcept
 {
@@ -38,9 +46,6 @@ constexpr auto query_or_default(query auto q, auto&&... args) noexcept
     else
         static_assert(_::mp_error<decltype(q)>::value, "query not supported");
 }
-template <typename Env, typename Q, typename... Args>
-using query_or_default_t
-    = decltype(query_or_default<Env>(std::declval<Q>(), std::declval<Args>()...));
 } // namespace exy
 
 #endif // EXY_SUPPORT_QUERY_HPP_INCLUDED

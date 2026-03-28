@@ -37,20 +37,10 @@ constexpr auto make_adaptor_proxy(exy::movable auto&&... args)
 namespace exy
 {
 template <typename Derived, typename Cont>
-struct adapter_continuation
+struct adapter_continuation : private Cont
 {
-    static constexpr exy::storage_ref get_result_storage(exy::ctx_base& ctx)
-    {
-        EXY_TAIL_CALL Cont::get_result_storage(ctx);
-    }
-
-    static constexpr auto query(exy::query auto q, exy::ctx_base& ctx)
-    {
-        if constexpr (requires { Derived::override_query(q, ctx); })
-            EXY_TAIL_CALL Derived::override_query(q, ctx);
-        else
-            EXY_TAIL_CALL Cont::query(q, ctx);
-    }
+    using Cont::get_result_storage;
+    using Cont::query;
 
     template <typename S>
     static constexpr void* call(exy::ctx_base& ctx)
