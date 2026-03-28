@@ -3,37 +3,12 @@
 
 #include <exy/future/schedule.hpp>
 
-#include <thread>
 #include <exy/future/factory.hpp>
 #include <exy/scheduler/inline.hpp>
-#include <exy/scheduler/parallel.hpp>
 #include "test.hpp"
 
 namespace exyf = exy::futures;
 namespace exys = exy::schedulers;
-
-namespace
-{
-constexpr struct background_backend : exy::parallel_scheduler_backend
-{
-    void schedule(job& j, exy::ctx_base& ctx) const override
-    {
-        // For the test we don't really care whether it truly runs in the background, just as long
-        // as it is a different thread.
-        std::jthread([&] { j.continuation(ctx); });
-    }
-} background_backend;
-
-const struct failing_backend : exy::parallel_scheduler_backend
-{
-    std::exception_ptr ex = std::make_exception_ptr(0);
-
-    void schedule(job&, exy::ctx_base&) const override
-    {
-        std::rethrow_exception(ex);
-    }
-} failing_backend;
-} // namespace
 
 TEST_CASE("schedule", "[futures]")
 {

@@ -9,6 +9,7 @@
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_templated.hpp>
+#include <exy/scheduler/parallel.hpp>
 #include <exy/support/future.hpp>
 #include <exy/support/query.hpp>
 
@@ -265,4 +266,24 @@ constexpr auto with_signature(F&& f)
     };
     return F2{exy_mov(f)};
 }
+
+constexpr struct background_backend : exy::parallel_scheduler_backend
+{
+    void schedule(job& j, exy::ctx_base& ctx) const override
+    {
+        // For the test we don't really care whether it truly runs in the background, just as long
+        // as it is a different thread.
+        std::jthread([&] { j.continuation(ctx); });
+    }
+} background_backend;
+
+const struct failing_backend : exy::parallel_scheduler_backend
+{
+    std::exception_ptr ex = std::make_exception_ptr(0);
+
+    void schedule(job&, exy::ctx_base&) const override
+    {
+        std::rethrow_exception(ex);
+    }
+} failing_backend;
 

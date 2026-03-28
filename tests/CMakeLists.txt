@@ -16,6 +16,7 @@ add_executable(exy_tests
     future/when_all.cpp
     future/when_any.cpp
     future/with.cpp
+    future/yield.cpp
     scheduler/defer.cpp
 )
 target_link_libraries(exy_tests PRIVATE exy_dev Catch2::Catch2WithMain)
