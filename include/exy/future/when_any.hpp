@@ -4,9 +4,7 @@
 #ifndef EXY_FUTURE_WHEN_ANY_HPP_INCLUDED
 #define EXY_FUTURE_WHEN_ANY_HPP_INCLUDED
 
-#include <atomic>
-#include <exy/query/stop.hpp>
-#include <exy/support/adapter.hpp>
+#include <exy/future/_when.hpp>
 
 namespace exy::futures
 {
@@ -30,88 +28,20 @@ struct _wany : exy::future_base
     }
 
     template <typename Cont>
-    struct op
+    using op = _when_op<_wany, Cont>;
+
+    template <typename S>
+    static consteval bool _stop_on() noexcept
     {
-        template <std::size_t Idx>
-        struct _c : exy::adapter_continuation<_c<Idx>, Cont>
-        {
-            static constexpr auto& get_future(exy::ctx_base& ctx) noexcept
-            {
-                return std::get<Idx>(Cont::get_future(ctx)._base);
-            }
-            static constexpr auto& get_op(exy::ctx_base& ctx) noexcept
-            {
-                return std::get<Idx>(Cont::get_op(ctx)._base);
-            }
-            static constexpr exy::storage_ref get_result_storage(exy::ctx_base& ctx) noexcept
-            {
-                return exy::storage_ref(std::get<Idx>(Cont::get_op(ctx)._storage));
-            }
+        return true;
+    }
 
-            static constexpr bool override_query(
-                exy::queries::stop_requested_t q, exy::ctx_base& ctx
-            )
-            {
-                op& self = Cont::get_op(ctx);
-                if (self._done.load(std::memory_order_relaxed) > 0)
-                    return true;
-
-                if constexpr (exy::has_query<Cont, exy::queries::stop_requested_t, exy::ctx_base&>)
-                    EXY_TAIL_CALL Cont::query(q, ctx);
-                else
-                    return false;
-            }
-
-            template <typename S>
-            static constexpr exy::continuation continuation_for(exy::ctx_base& ctx) noexcept
-            {
-                op&              self   = Cont::get_op(ctx);
-                exy::storage_ref result = Cont::get_result_storage(ctx);
-
-                exy::storage_ref base_result = get_result_storage(ctx);
-                auto [... args]              = base_result.get<S>();
-
-                auto prev_count = self._done.fetch_add(1, std::memory_order_acq_rel);
-                if (prev_count == 0)
-                {
-                    // First one to complete, store the result.
-                    self._continuation = exy::set<signatures, Cont, S>(result, exy_mov(args)...);
-                }
-
-                if (prev_count + 1 == sizeof...(F))
-                    // Last to complete, forward the actual result.
-                    return self._continuation;
-                else
-                    // Still have to wait for more to complete.
-                    return nullptr;
-            }
-        };
-
-        template <typename Idxs>
-        struct _make_op_pack;
-        template <std::size_t... Idx>
-        struct _make_op_pack<std::index_sequence<Idx...>>
-        {
-            using type = exy::pack<exy::op_of<F, _c<Idx>>...>;
-        };
-
-        EXY_NO_UNIQUE_ADDRESS _make_op_pack<std::index_sequence_for<F...>>::type _base;
-        EXY_NO_UNIQUE_ADDRESS exy::pack<exy::storage<F::storage_spec()>...> _storage;
-        std::atomic<unsigned>                                               _done = 0;
-        exy::continuation                                                   _continuation;
-
-        static constexpr void* start(exy::ctx_base& ctx)
-        {
-            op& self = Cont::get_op(ctx);
-
-            [&]<typename... FI, std::size_t... Idx>(
-                _::mp_list<FI...>, std::index_sequence<Idx...>
-            ) {
-                (FI::template op<_c<Idx>>::start(ctx), ...);
-            }(_::mp_pop_back<_::mp_list<F...>>{}, std::make_index_sequence<sizeof...(F) - 1>{});
-            EXY_TAIL_CALL F...[sizeof...(F) - 1] ::template op<_c<sizeof...(F) - 1>>::start(ctx);
-        }
-    };
+    template <typename Cont>
+    static constexpr exy::continuation _on_complete(exy::ctx_base& ctx) noexcept
+    {
+        op<Cont>& self = Cont::get_op(ctx);
+        return self._continuation.load(std::memory_order_relaxed);
+    }
 };
 
 inline constexpr struct when_any_t

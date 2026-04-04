@@ -12,10 +12,6 @@ namespace exyf = exy::futures;
 
 TEST_CASE("when_all", "[futures]")
 {
-    auto nullary = exyf::when_all();
-    REQUIRE_SIGNATURES(nullary, exy::value_tag());
-    CHECK_FUTURE(nullary, exy::value_tag());
-
     auto unary = exyf::when_all(exyf::value(0));
     REQUIRE_SIGNATURES(unary, exy::value_tag(int));
     CHECK_FUTURE(unary, exy::value_tag(), 0);

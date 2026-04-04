@@ -4,9 +4,7 @@
 #ifndef EXY_FUTURE_WHEN_ALL_HPP_INCLUDED
 #define EXY_FUTURE_WHEN_ALL_HPP_INCLUDED
 
-#include <atomic>
-#include <exy/query/stop.hpp>
-#include <exy/support/adapter.hpp>
+#include <exy/future/_when.hpp>
 
 namespace exy::futures
 {
@@ -34,141 +32,53 @@ struct _wall : exy::future_base
     }
 
     template <typename Cont>
-    struct op
+    using op = _when_op<_wall, Cont>;
+
+    template <typename S>
+    static consteval bool _stop_on() noexcept
     {
-        template <std::size_t Idx>
-        struct _c : exy::adapter_continuation<_c<Idx>, Cont>
+        return !exy::signature_with_tag<S, exy::value_tag>;
+    }
+
+    template <typename Cont>
+    static constexpr exy::continuation _on_complete(exy::ctx_base& ctx) noexcept
+    {
+        op<Cont>& self = Cont::get_op(ctx);
+
+        if (auto cont = self._continuation.load(std::memory_order_relaxed))
+            // We already have a failure, call it.
+            return cont;
+
+        auto result = Cont::get_result_storage(ctx);
+        try
         {
-            static constexpr auto& get_future(exy::ctx_base& ctx) noexcept
-            {
-                return std::get<Idx>(Cont::get_future(ctx)._base);
-            }
-            static constexpr auto& get_op(exy::ctx_base& ctx) noexcept
-            {
-                return std::get<Idx>(Cont::get_op(ctx)._base);
-            }
-            static constexpr exy::storage_ref get_result_storage(exy::ctx_base& ctx) noexcept
-            {
-                return exy::storage_ref(std::get<Idx>(Cont::get_op(ctx)._storage));
-            }
-
-            static constexpr bool override_query(
-                exy::queries::stop_requested_t q, exy::ctx_base& ctx
-            )
-            {
-                op& self = Cont::get_op(ctx);
-                if (self._error_continuation.load(std::memory_order_relaxed) != nullptr)
-                    return true;
-
-                if constexpr (exy::has_query<Cont, exy::queries::stop_requested_t, exy::ctx_base&>)
-                    EXY_TAIL_CALL Cont::query(q, ctx);
-                else
-                    return false;
-            }
-
-            template <exy::signature_with_tag<exy::value_tag> S>
-            static constexpr exy::continuation continuation_for(exy::ctx_base& ctx) noexcept
-            {
-                op& self = Cont::get_op(ctx);
-                return self._complete(Cont::get_result_storage(ctx));
-            }
-
-            template <typename S> // error or stopped
-            static constexpr exy::continuation continuation_for(exy::ctx_base& ctx) noexcept
-            {
-                op&              self        = Cont::get_op(ctx);
-                exy::storage_ref result      = Cont::get_result_storage(ctx);
-                exy::storage_ref base_result = get_result_storage(ctx);
-
-                exy::continuation expected = nullptr;
-                if (self._error_continuation.compare_exchange_strong(
-                        expected, &Cont::template call<S>, std::memory_order_relaxed,
-                        std::memory_order_relaxed
-                    ))
-                {
-                    // We are the first failure, properly set it.
-                    auto [... args] = base_result.get<S>();
-                    result.template emplace<S>(exy_mov(args)...);
-                }
-
-                return self._complete(result);
-            }
-        };
-
-        template <typename Idxs>
-        struct _make_op_pack;
-        template <std::size_t... Idx>
-        struct _make_op_pack<std::index_sequence<Idx...>>
-        {
-            using type = exy::pack<exy::op_of<F, _c<Idx>>...>;
-        };
-
-        EXY_NO_UNIQUE_ADDRESS _make_op_pack<std::index_sequence_for<F...>>::type _base;
-        EXY_NO_UNIQUE_ADDRESS exy::pack<exy::storage<F::storage_spec()>...> _storage;
-        std::atomic<exy::continuation> _error_continuation = nullptr;
-        std::atomic<unsigned>          _done               = 0;
-
-        exy::continuation _complete(exy::storage_ref result) noexcept
-        {
-            if (_done.fetch_add(1, std::memory_order_acq_rel) + 1 < sizeof...(F))
-                return nullptr;
-
-            if (auto cont = _error_continuation.load(std::memory_order_relaxed))
-                return cont;
-
-            try
-            {
-                auto& [... storage] = _storage;
-                auto [... args]     = std::tuple_cat([&] {
-                    using signature
-                        = _::mp_only<_::mp_filter<exy::value_tag::is, exy::signatures_of<F>>>;
-                    auto [... args] = exy::storage_ref(storage).get<signature>();
-                    return std::make_tuple(exy_mov(args)...);
-                }()...);
-                return exy::set<signatures, Cont, _value_signature>(result, exy_mov(args)...);
-            }
-            catch (...)
-            {
-                return exy::set_exception<signatures, Cont>(result);
-            }
+            auto& [... storage] = self._storage;
+            auto [... args]     = std::tuple_cat([&] {
+                using signature
+                    = _::mp_only<_::mp_filter<exy::value_tag::is, exy::signatures_of<F>>>;
+                auto [... args] = exy::storage_ref(storage).get<signature>();
+                return std::make_tuple(exy_mov(args)...);
+            }()...);
+            return exy::set<signatures, Cont, _value_signature>(result, exy_mov(args)...);
         }
-
-        static constexpr void* start(exy::ctx_base& ctx)
+        catch (...)
         {
-            exy::storage_ref result = Cont::get_result_storage(ctx);
-            if constexpr (sizeof...(F) == 0)
-            {
-                auto          cont = exy::set<signatures, Cont, _value_signature>(result);
-                EXY_TAIL_CALL cont(ctx);
-            }
-            else
-            {
-                op& self = Cont::get_op(ctx);
-
-                [&]<typename... FI, std::size_t... Idx>(
-                    _::mp_list<FI...>, std::index_sequence<Idx...>
-                ) {
-                    (FI::template op<_c<Idx>>::start(ctx), ...);
-                }(_::mp_pop_back<_::mp_list<F...>>{}, std::make_index_sequence<sizeof...(F) - 1>{});
-                EXY_TAIL_CALL F...[sizeof...(F) - 1] ::template op<_c<sizeof...(F) - 1>>::start(
-                    ctx
-                );
-            }
+            return exy::set_exception<signatures, Cont>(result);
         }
-    };
+    }
 };
 
 inline constexpr struct when_all_t
 {
-    template <exy::future F>
-        requires exy::single_value_signatures<exy::signatures_of<F>>
+    template <exy::future F, typename S = exy::signatures_of<F>>
+        requires exy::single_value_signatures<S>
     static constexpr F&& operator()(F&& f)
     {
         return exy_mov(f);
     }
 
     template <exy::future... F>
-        requires (exy::single_value_signatures<exy::signatures_of<F>> && ...)
+        requires (sizeof...(F) > 1) && (exy::single_value_signatures<exy::signatures_of<F>> && ...)
     static constexpr _wall<F...> operator()(F&&... f)
     {
         return {{}, exy::make_pack(exy_mov(f)...)};
