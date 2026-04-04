@@ -5,6 +5,7 @@
 #define EXY_FUTURE_REPEAT_HPP_INCLUDED
 
 #include <optional>
+#include <exy/future/yield.hpp>
 #include <exy/query/stop.hpp>
 #include <exy/support/adapter.hpp>
 
@@ -56,8 +57,13 @@ struct _r : exy::future_base
 
         static constexpr exy::continuation _restart(exy::ctx_base& ctx) noexcept
         {
-            op& self = Cont::get_op(ctx);
-            _r& f    = Cont::get_future(ctx);
+            op&              self   = Cont::get_op(ctx);
+            _r&              f      = Cont::get_future(ctx);
+            exy::storage_ref result = Cont::get_result_storage(ctx);
+
+            if (exy::query_or_default<Cont>(queries::stop_requested, ctx))
+                return exy::set<signatures, Cont, exy::stopped_tag()>(result);
+
             try
             {
                 if constexpr (std::same_as<decltype(_state), _simple_state>)
@@ -74,7 +80,7 @@ struct _r : exy::future_base
             }
             catch (...)
             {
-                return exy::set_exception<signatures, Cont>(Cont::get_result_storage(ctx));
+                return exy::set_exception<signatures, Cont>(result);
             }
         }
 
@@ -100,11 +106,7 @@ struct _r : exy::future_base
             {
                 exy::storage_ref result = Cont::get_result_storage(ctx);
                 (void)result.get<S>(); // destroy
-
-                if (exy::query_or_default<Cont>(queries::stop_requested, ctx))
-                    return exy::set<signatures, Cont, exy::stopped_tag()>(result);
-                else
-                    return _restart(ctx);
+                return _restart(ctx);
             }
         };
 
@@ -115,13 +117,23 @@ struct _r : exy::future_base
     };
 };
 
-inline constexpr struct repeat_t : exy::adapter
+inline constexpr struct eager_repeat_t : exy::adapter
 {
     template <exy::future F, typename S = exy::signatures_of<F>>
         requires std::is_copy_constructible_v<F> && exy::void_value_signature<S>
     static constexpr _r<F> operator()(F&& f)
     {
         return {{}, exy_mov(f)};
+    }
+} eager_repeat;
+
+inline constexpr struct repeat_t : exy::adapter
+{
+    template <exy::future F, typename S = exy::signatures_of<F>>
+        requires std::is_copy_constructible_v<F> && exy::void_value_signature<S>
+    static constexpr auto operator()(F&& f)
+    {
+        return exy::futures::eager_repeat(exy::futures::yield(exy_mov(f)));
     }
 } repeat;
 } // namespace exy::futures
