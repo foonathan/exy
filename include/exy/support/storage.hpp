@@ -15,6 +15,11 @@ struct storage_spec
     std::size_t size;
     std::size_t alignment;
 
+    template <typename T>
+    static consteval storage_spec get() noexcept
+    {
+        return {sizeof(T), alignof(T)};
+    }
     template <typename Tag, typename... T>
     static consteval storage_spec get(std::type_identity<Tag(T...)>) noexcept
     {

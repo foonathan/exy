@@ -22,11 +22,13 @@ inline constexpr struct sync_wait_t
     template <typename F>
     struct _c : exy::ctx_base
     {
-        F&                              _f;
-        exy::op_of<F, _c>               _op;
-        std::exception_ptr              _ex   = {};
-        std::atomic<bool>               _done = false;
-        exy::storage<F::storage_spec()> _result;
+        F&                 _f;
+        exy::op_of<F, _c>  _op;
+        std::exception_ptr _ex   = {};
+        std::atomic<bool>  _done = false;
+        exy::storage<
+            exy::max(F::storage_spec(), exy::storage_spec::get<std::optional<_value_type<F>>>())>
+            _result;
 
         constexpr explicit _c(F& f) noexcept : _f(f) {}
 
