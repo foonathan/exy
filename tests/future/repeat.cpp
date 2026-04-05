@@ -5,6 +5,7 @@
 
 #include <exy/future/factory.hpp>
 #include <exy/future/transform.hpp>
+#include <exy/future/when_any.hpp>
 #include "test.hpp"
 
 namespace exyf = exy::futures;
@@ -53,5 +54,38 @@ TEST_CASE("repeat in stop_env", "[futures]")
         failing, exy::error_tag(int), exy::error_tag(std::exception_ptr), exy::stopped_tag()
     );
     CHECK_FUTURE(failing, exy::error_tag(), 0);
+}
+
+TEST_CASE("repeat in when_any", "[futures]")
+{
+    int count = 0;
+
+    SECTION("one repeat")
+    {
+        auto f = exyf::when_any(
+            exyf::value() | exyf::yield | exyf::yield | exyf::yield,
+            exyf::value() | exyf::transform([&] noexcept { ++count; }) | exyf::repeat
+        );
+        REQUIRE_SIGNATURES(f, exy::value_tag(), exy::stopped_tag());
+        CHECK_FUTURE(f, exy::value_tag());
+        CHECK(count == 3);
+    }
+    SECTION("two repeat")
+    {
+        auto f = exyf::when_any(
+            exyf::value() | exyf::yield | exyf::yield | exyf::yield,
+            exyf::value() | exyf::transform([&] noexcept {
+                CHECK(count % 2 == 0);
+                ++count;
+            }) | exyf::repeat,
+            exyf::value() | exyf::transform([&] noexcept {
+                CHECK(count % 2 == 1);
+                ++count;
+            }) | exyf::repeat
+        );
+        REQUIRE_SIGNATURES(f, exy::value_tag(), exy::stopped_tag());
+        CHECK_FUTURE(f, exy::value_tag());
+        CHECK(count == 6);
+    }
 }
 

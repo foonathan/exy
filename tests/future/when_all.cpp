@@ -6,6 +6,7 @@
 #include <exy/future/factory.hpp>
 #include <exy/future/stop_point.hpp>
 #include <exy/future/transform.hpp>
+#include <exy/future/yield.hpp>
 #include "test.hpp"
 
 namespace exyf = exy::futures;
@@ -63,5 +64,26 @@ TEST_CASE("when_all", "[futures]")
     );
     REQUIRE_SIGNATURES(stop_on_stop, exy::stopped_tag(int), exy::stopped_tag(), exy::value_tag());
     CHECK_FUTURE(stop_on_stop, exy::stopped_tag(), 11);
+
+    auto counter      = 0;
+    auto interleaving = exyf::when_all(
+        exyf::value() | exyf::transform([&] noexcept { CHECK(counter++ == 0); }) | exyf::yield
+            | exyf::transform([&] noexcept {
+                  CHECK(counter++ == 3);
+                  return counter;
+              }),
+        exyf::value() | exyf::transform([&] noexcept { CHECK(counter++ == 1); }) | exyf::yield
+            | exyf::yield | exyf::transform([&]() noexcept {
+                  CHECK(counter++ == 5);
+                  return counter;
+              }),
+        exyf::value() | exyf::transform([&] noexcept { CHECK(counter++ == 2); }) | exyf::yield
+            | exyf::transform([&]() noexcept {
+                  CHECK(counter++ == 4);
+                  return counter;
+              })
+    );
+    REQUIRE_SIGNATURES(interleaving, exy::value_tag(int, int, int));
+    CHECK_FUTURE(interleaving, exy::value_tag(), 4, 6, 5);
 }
 
