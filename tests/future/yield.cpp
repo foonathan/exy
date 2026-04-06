@@ -17,7 +17,7 @@ struct yield_env_t : test_env_t
 
     static constexpr auto query(exy::queries::delegation_scheduler_t) noexcept
     {
-        return exys::parallel(background_backend);
+        return exys::parallel</*Noexcept=*/true>(background_backend);
     }
 };
 } // namespace
@@ -25,7 +25,7 @@ struct yield_env_t : test_env_t
 TEST_CASE("yield in default environment", "[futures]")
 {
     auto f = exyf::value(11) | exyf::yield;
-    REQUIRE_SIGNATURES(f, exy::value_tag(int), exy::error_tag(std::exception_ptr));
+    REQUIRE_SIGNATURES(f, exy::value_tag(int));
     CHECK_FUTURE(f, no_thread_change, exy::value_tag(), 11);
 }
 
@@ -34,7 +34,7 @@ TEST_CASE("yield in yield_env", "[futures]")
     yield_env_t test_env;
 
     auto f = exyf::value(11) | exyf::yield;
-    REQUIRE_SIGNATURES(f, exy::value_tag(int), exy::error_tag(std::exception_ptr));
+    REQUIRE_SIGNATURES(f, exy::value_tag(int));
     CHECK_FUTURE(f, thread_change, exy::value_tag(), 11);
 }
 

@@ -16,8 +16,7 @@ struct _y : exy::future_base
 {
     EXY_NO_UNIQUE_ADDRESS Base _base;
 
-    using signatures = exy::signatures_insert_exception<
-        exy::signatures_of<Base>, /* we cannot know whether the scheduler fails*/ false>;
+    using signatures = exy::signatures_of<Base>;
 
     static consteval auto storage_spec() noexcept
     {
@@ -33,6 +32,10 @@ struct _y : exy::future_base
     template <typename Cont>
     struct op : _co_impl_op<op<Cont>, exy::signatures_of<Base>, _scheduler_future<Cont>, Cont>
     {
+        static_assert(
+            exy::nothrow_scheduler<_scheduler<Cont>>, "delegation scheduler must not fail"
+        );
+
         static constexpr _scheduler_future<Cont>& _get_scheduler_future(exy::ctx_base& ctx) noexcept
         {
             return *Cont::get_op(ctx)._sch;

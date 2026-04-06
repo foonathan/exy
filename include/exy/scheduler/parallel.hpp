@@ -30,13 +30,15 @@ protected:
 
 namespace exy::schedulers
 {
+template <bool Noexcept = false>
 class parallel : public exy::scheduler_base
 {
     struct _f : exy::future_base
     {
         const parallel_scheduler_backend* _backend;
 
-        using signatures = exy::signatures<exy::value_tag(), exy::error_tag(std::exception_ptr)>;
+        using signatures
+            = exy::signatures_insert_exception<exy::signatures<exy::value_tag()>, Noexcept>;
 
         static consteval auto storage_spec() noexcept
         {
