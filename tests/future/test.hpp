@@ -10,8 +10,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_templated.hpp>
 #include <exy/scheduler/parallel.hpp>
+#include <exy/support/adapter.hpp>
 #include <exy/support/future.hpp>
 #include <exy/support/query.hpp>
+#include <exy/sync_wait.hpp>
 
 struct test_result
 {
@@ -130,95 +132,71 @@ struct test_result_matcher : Catch::Matchers::MatcherGenericBase
 
 inline constexpr struct test_run_t
 {
-    template <typename F>
-    static consteval auto _storage_spec() noexcept
+    template <typename Env, typename Base>
+    struct _f : exy::future_base
     {
-        return exy::max(
-            F::storage_spec(), exy::storage_spec{sizeof(test_result), alignof(test_result)}
-        );
-    }
+        const Env& _env;
+        Base       _base;
 
-    template <typename Env, typename F>
-    struct _c
-    {
-        const Env&                       _env;
-        std::atomic<bool>                _done = false;
-        exy::storage<_storage_spec<F>()> _result;
+        using signatures = exy::signatures<exy::value_tag(test_result)>;
 
-        constexpr explicit _c(const Env& env) noexcept : _env(env) {}
-
-        static constexpr _c&                _get_self(exy::ctx_base& ctx) noexcept;
-        static constexpr F&                 get_future(exy::ctx_base& ctx) noexcept;
-        static constexpr exy::op_of<F, _c>& get_op(exy::ctx_base& ctx) noexcept;
-
-        static constexpr exy::storage_ref get_result_storage(exy::ctx_base& ctx) noexcept
+        static consteval auto storage_spec() noexcept
         {
-            return exy::storage_ref(_get_self(ctx)._result);
+            return exy::max(Base::storage_spec(), exy::storage_spec::get(signatures()));
         }
 
-        static constexpr auto query(exy::query auto q, exy::ctx_base& ctx) noexcept
-            -> decltype(std::declval<const Env&>().query(q))
+        template <typename Cont>
+        struct op
         {
-            return _get_self(ctx)._env.query(q);
-        }
+            struct _c : exy::adapter_continuation<_c, Cont>
+            {
+                static constexpr Base& get_future(exy::ctx_base& ctx) noexcept
+                {
+                    return Cont::get_future(ctx)._base;
+                }
+                static constexpr exy::op_of<Base, _c>& get_op(exy::ctx_base& ctx) noexcept
+                {
+                    return Cont::get_op(ctx)._base;
+                }
 
-        template <typename S>
-        static constexpr void* call(exy::ctx_base& ctx)
-        {
-            auto& self   = _get_self(ctx);
-            auto  result = get_result_storage(ctx);
+                static constexpr auto query(exy::query auto q, exy::ctx_base& ctx) noexcept
+                    -> decltype(std::declval<const Env&>().query(q))
+                {
+                    return Cont::get_future(ctx)._env.query(q);
+                }
 
-            auto [... args] = result.get<S>();
-            result.emplace_raw<test_result>(
-                std::this_thread::get_id(), exy::signature_tag<S>{}, exy_mov(args)...
-            );
+                template <typename S>
+                static constexpr exy::continuation continuation_for(exy::ctx_base& ctx) noexcept
+                {
+                    exy::storage_ref result = Cont::get_result_storage(ctx);
 
-            self._done.store(true, std::memory_order_release);
-            self._done.notify_one();
+                    auto [... args] = result.get<S>();
+                    return exy::set<signatures, Cont, exy::value_tag(test_result)>(
+                        result,
+                        test_result(
+                            std::this_thread::get_id(), exy::signature_tag<S>{}, exy_mov(args)...
+                        )
+                    );
+                }
+            };
 
-            return nullptr;
-        }
-    };
+            exy::op_of<Base, _c> _base;
 
-    template <typename Env, typename F>
-    struct _ctx : exy::ctx_base, _c<Env, F>
-    {
-        F&                        _f;
-        exy::op_of<F, _c<Env, F>> _op;
-
-        constexpr explicit _ctx(const Env& env, F& f) noexcept : _c<Env, F>(env), _f(f) {}
+            static constexpr void* start(exy::ctx_base& ctx)
+            {
+                op&           self = Cont::get_op(ctx);
+                EXY_TAIL_CALL self._base.start(ctx);
+            }
+        };
     };
 
     template <typename Env, exy::future F>
     static constexpr test_result operator()(const Env& env, F&& f)
     {
-        _ctx ctx(env, f);
-        ctx._op.start(ctx);
-        ctx._done.wait(false, std::memory_order_acquire);
-
-        return exy::storage_ref(ctx._result).get_raw<test_result>();
+        auto [result] = *exy::sync_wait(_f{{}, env, exy_mov(f)});
+        return result;
     }
 } test_run;
-
-template <typename Env, typename F>
-constexpr test_run_t::_c<Env, F>& test_run_t::_c<Env, F>::_get_self(exy::ctx_base& ctx) noexcept
-{
-    return static_cast<_ctx<Env, F>&>(ctx);
-}
-
-template <typename Env, typename F>
-constexpr F& test_run_t::_c<Env, F>::get_future(exy::ctx_base& ctx) noexcept
-{
-    return static_cast<_ctx<Env, F>&>(ctx)._f;
-}
-
-template <typename Env, typename F>
-constexpr exy::op_of<F, test_run_t::_c<Env, F>>& test_run_t::_c<Env, F>::get_op(
-    exy::ctx_base& ctx
-) noexcept
-{
-    return static_cast<_ctx<Env, F>&>(ctx)._op;
-}
 
 inline constexpr struct test_env_t
 {
