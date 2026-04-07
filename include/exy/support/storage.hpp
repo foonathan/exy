@@ -6,6 +6,7 @@
 
 #include <compare>
 #include <exy/support/base.hpp>
+#include <exy/support/invoke.hpp>
 #include <exy/support/signature.hpp>
 
 namespace exy
@@ -73,6 +74,11 @@ public:
     constexpr storage_ref(storage<Spec>& s) noexcept : _ptr(&s._buffer)
     {}
 
+    constexpr void emplace_result(auto&& fn) noexcept(noexcept(auto(exy_fwd(fn)())))
+    {
+        ::new(_ptr) auto(exy_fwd(fn)());
+    }
+
     template <typename T>
     constexpr void emplace_raw(auto&&... args)
     {
@@ -95,11 +101,40 @@ public:
         ptr->~T();
         return result;
     }
+    template <typename T>
+    constexpr auto with_raw(auto&& fn)
+    {
+        auto ptr = static_cast<T*>(_ptr);
+        try
+        {
+            if constexpr (std::is_void_v<exy::invoke_result_t<decltype(fn), T&&>>)
+            {
+                exy_invoke(exy_fwd(fn), exy_mov(*ptr));
+                ptr->~T();
+            }
+            else
+            {
+                auto result = exy_invoke(exy_fwd(fn), exy_mov(*ptr));
+                ptr->~T();
+                return result;
+            }
+        }
+        catch (...)
+        {
+            ptr->~T();
+            throw;
+        }
+    }
 
     template <typename S>
     constexpr auto get() noexcept
     {
         return get_raw<exy::signature_arguments_as<S, _::mp_quote<exy::pack>>>();
+    }
+    template <typename S>
+    constexpr auto with(auto&& fn)
+    {
+        return with_raw<exy::signature_arguments_as<S, _::mp_quote<exy::pack>>>(exy_fwd(fn));
     }
 
     template <typename T>

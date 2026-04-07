@@ -43,5 +43,10 @@ TEMPLATE_TEST_CASE(
     auto throwing_move_result = factory() | transform([] noexcept { return move_only(0); });
     REQUIRE_SIGNATURES(throwing_move_result, to_tag(move_only), exy::error_tag(std::exception_ptr));
     CHECK_FUTURE(throwing_move_result, to_tag(), move_only(0));
+
+    auto imm = exyf::run_t<from_tag>{}([] noexcept { return immovable(11); })
+             | transform([](immovable&& imm) noexcept { return imm.value; });
+    REQUIRE_SIGNATURES(imm, to_tag(int));
+    CHECK_FUTURE(imm, to_tag(), 11);
 }
 

@@ -235,6 +235,22 @@ struct move_only
     }
 };
 
+struct immovable
+{
+    int value;
+
+    explicit immovable(int value) : value(value) {}
+    immovable(const immovable&)            = delete;
+    immovable& operator=(const immovable&) = delete;
+
+    bool operator==(const immovable&) const = default;
+
+    [[maybe_unused]] friend std::ostream& operator<<(std::ostream& os, const immovable& m)
+    {
+        return os << "immovable(" << m.value << ")";
+    }
+};
+
 template <typename... S, exy::future F>
 constexpr auto with_signature(F&& f)
 {

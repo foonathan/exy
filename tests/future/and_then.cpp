@@ -43,5 +43,10 @@ TEMPLATE_TEST_CASE("and_then", "[futures]", exy::value_tag, exy::error_tag, exy:
         throwing_state, exy::value_tag(move_only), exy::error_tag(std::exception_ptr)
     );
     CHECK_FUTURE(throwing_state, exy::value_tag(), move_only(42));
+
+    auto imm = exyf::run_t<TestType>{}([] noexcept { return immovable(11); })
+             | and_then([](immovable&& imm) noexcept { return exyf::value(imm.value); });
+    REQUIRE_SIGNATURES(imm, exy::value_tag(int));
+    CHECK_FUTURE(imm, exy::value_tag(), 11);
 }
 

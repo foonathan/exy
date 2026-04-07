@@ -5,16 +5,17 @@
 #define EXY_FUTURE_FACTORY_HPP_INCLUDED
 
 #include <exy/support/future.hpp>
+#include <exy/support/invoke.hpp>
 
 namespace exy::futures
 {
-template <typename Tag, typename... Ts>
+template <typename S, typename Fn>
 struct _f : exy::future_base
 {
-    EXY_NO_UNIQUE_ADDRESS exy::pack<Ts...> _pack;
+    EXY_NO_UNIQUE_ADDRESS Fn _fn;
 
     using signatures = exy::signatures_insert_exception<
-        exy::signatures<Tag(Ts...)>, (std::is_nothrow_move_constructible_v<Ts> && ...)>;
+        exy::signatures<S>, exy::is_nothrow_invocable<Fn, exy::storage_ref>::value>;
 
     static consteval auto storage_spec() noexcept
     {
@@ -32,8 +33,8 @@ struct _f : exy::future_base
             auto cont = [&] {
                 try
                 {
-                    result.emplace_raw<exy::pack<Ts...>>(exy_mov(self)._pack);
-                    return &Cont::template call<Tag(Ts...)>;
+                    exy_invoke(self._fn, result);
+                    return &Cont::template call<S>;
                 }
                 catch (...)
                 {
@@ -48,16 +49,53 @@ struct _f : exy::future_base
 template <typename Tag>
 struct factory_t
 {
-    template <exy::movable... Ts>
-    static constexpr _f<Tag, std::decay_t<Ts>...> operator()(Ts&&... args)
+    template <typename... Ts>
+    using _signature = Tag(std::decay_t<Ts>...);
+
+    template <typename... Ts>
+    static constexpr auto _factory(Ts&&... args)
     {
-        return {{}, exy::make_pack(exy_fwd(args)...)};
+        constexpr auto nothrow = (std::is_nothrow_move_constructible_v<std::decay_t<Ts>> && ...);
+        return [... args = exy_fwd(args)](exy::storage_ref result) mutable noexcept(nothrow) {
+            result.emplace<_signature<Ts...>>(exy_mov(args)...);
+        };
+    }
+
+    template <exy::movable... Ts>
+    static constexpr auto operator()(Ts&&... args)
+        -> _f<_signature<Ts...>, decltype(_factory(exy_fwd(args)...))>
+    {
+        return {{}, _factory(exy_fwd(args)...)};
     }
 };
 
 inline constexpr factory_t<exy::value_tag>   value;
 inline constexpr factory_t<exy::error_tag>   error;
 inline constexpr factory_t<exy::stopped_tag> stopped;
+
+template <typename Tag>
+struct run_t
+{
+    template <typename Fn>
+    static constexpr auto _factory(Fn&& fn)
+    {
+        return [fn = exy_fwd(fn)](exy::storage_ref result) mutable noexcept(
+                   noexcept(result.emplace_result(exy_mov(fn)))
+               ) { //
+            result.emplace_result(exy_mov(fn));
+        };
+    }
+
+    template <exy::movable Fn>
+        requires exy::invocable<Fn>
+    static constexpr auto operator()(Fn&& fn)
+        -> _f<Tag(exy::invoke_result_t<Fn>), decltype(_factory(exy_fwd(fn)))>
+    {
+        return {{}, _factory(exy_fwd(fn))};
+    }
+};
+
+inline constexpr run_t<exy::value_tag> run;
 } // namespace exy::futures
 
 #endif // EXY_FUTURE_FACTORY_HPP_INCLUDED

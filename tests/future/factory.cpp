@@ -24,3 +24,20 @@ TEMPLATE_TEST_CASE("factory", "[futures]", exy::value_tag, exy::error_tag, exy::
     CHECK_FUTURE(f(move_only(17)), TestType(), move_only(17));
 }
 
+TEST_CASE("run", "[futures]")
+{
+    auto nothrow = exyf::run([] noexcept { return 11; });
+    REQUIRE_SIGNATURES(nothrow, exy::value_tag(int));
+    CHECK_FUTURE(nothrow, exy::value_tag(), 11);
+
+    auto throwing = exyf::run([] { return 11; });
+    REQUIRE_SIGNATURES(throwing, exy::value_tag(int), exy::error_tag(std::exception_ptr));
+    CHECK_FUTURE(throwing, exy::value_tag(), 11);
+
+    auto throwing_move = exyf::run([] { return move_only(11); });
+    REQUIRE_SIGNATURES(
+        throwing_move, exy::value_tag(move_only), exy::error_tag(std::exception_ptr)
+    );
+    CHECK_FUTURE(throwing_move, exy::value_tag(), move_only(11));
+}
+

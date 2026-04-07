@@ -86,15 +86,16 @@ struct _at : exy::future_base
 
                 try
                 {
-                    auto [... args] = result.get<S>();
+                    return result.with<S>([&](auto&& pack) {
+                        auto&& [... args] = exy_mov(pack);
 
-                    using sub_t = exy::invoke_result_t<Fn, decltype(args)...>;
-                    op._sub_future.template emplace<sub_t>(
-                        exy_invoke(exy_mov(f)._fn, exy_mov(args)...)
-                    );
-                    auto& sub_op = op._sub_op.template emplace<exy::op_of<sub_t, _cs<sub_t>>>();
+                        using sub_t = exy::invoke_result_t<Fn, decltype(args)...>;
+                        op._sub_future.template emplace<sub_t>(
+                            exy_invoke(exy_mov(f)._fn, exy_mov(args)...)
+                        );
 
-                    return &sub_op.start;
+                        return &op._sub_op.template emplace<exy::op_of<sub_t, _cs<sub_t>>>().start;
+                    });
                 }
                 catch (...)
                 {
