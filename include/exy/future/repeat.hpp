@@ -11,14 +11,14 @@
 
 namespace exy::futures
 {
-template <typename Base>
+template <typename Tag, typename Base>
 struct _r : exy::future_base
 {
     EXY_NO_UNIQUE_ADDRESS Base _base;
 
     using signatures = exy::signatures_insert_exception<
         exy::signatures_replace_tag<
-            exy::signatures_of<Base>, exy::value_tag, exy::signatures<exy::stopped_tag()>>,
+            exy::signatures_of<Base>, Tag, exy::signatures<exy::stopped_tag()>>,
         std::is_nothrow_copy_constructible_v<Base>>;
 
     static consteval auto storage_spec() noexcept
@@ -101,7 +101,7 @@ struct _r : exy::future_base
                     return Cont::get_op(ctx)._state.impl->op;
             }
 
-            template <exy::signature_with_tag<exy::value_tag> S>
+            template <exy::signature_with_tag<Tag> S>
             static constexpr exy::continuation continuation_for(exy::ctx_base& ctx) noexcept
             {
                 exy::storage_ref result = Cont::get_result_storage(ctx);
@@ -117,27 +117,33 @@ struct _r : exy::future_base
     };
 };
 
-inline constexpr struct eager_repeat_t : exy::adapter
+template <typename Tag>
+struct eager_repeat_t : exy::adapter
 {
     template <exy::future F, typename S = exy::signatures_of<F>>
         requires std::is_copy_constructible_v<F>
-              && exy::unique_signature_with_tag_is<S, exy::value_tag, void>
-    static constexpr _r<F> operator()(F&& f)
+    static constexpr _r<Tag, F> operator()(F&& f)
     {
         return {{}, exy_mov(f)};
     }
-} eager_repeat;
+};
 
-inline constexpr struct repeat_t : exy::adapter
+inline constexpr eager_repeat_t<exy::value_tag> eager_repeat;
+inline constexpr eager_repeat_t<exy::error_tag> eager_retry;
+
+template <typename Tag>
+struct repeat_t : exy::adapter
 {
     template <exy::future F, typename S = exy::signatures_of<F>>
         requires std::is_copy_constructible_v<F>
-              && exy::unique_signature_with_tag_is<S, exy::value_tag, void>
     static constexpr auto operator()(F&& f)
     {
-        return exy::futures::eager_repeat(exy::futures::yield(exy_mov(f)));
+        return exy::futures::eager_repeat_t<Tag>{}(exy::futures::yield(exy_mov(f)));
     }
-} repeat;
+};
+
+inline constexpr repeat_t<exy::value_tag> repeat;
+inline constexpr repeat_t<exy::error_tag> retry;
 } // namespace exy::futures
 
 #endif // EXY_FUTURE_REPEAT_HPP_INCLUDED

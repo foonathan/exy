@@ -8,18 +8,18 @@
 
 namespace exy::futures
 {
-template <typename... F>
+template <typename Tag, typename... F>
 struct _wall : exy::future_base
 {
     EXY_NO_UNIQUE_ADDRESS exy::pack<F...> _base;
 
     using _value_signature = _::mp_apply<
-        exy::value_tag::make, _::mp_append<exy::signature_arguments<exy::unique_signature_with_tag<
-                                  exy::signatures_of<F>, exy::value_tag>>...>>;
+        Tag::template make, _::mp_append<exy::signature_arguments<
+                                exy::unique_signature_with_tag<exy::signatures_of<F>, Tag>>...>>;
 
     using signatures = exy::signatures_insert_exception<
         exy::signatures_replace_tag<
-            _::mp_append<exy::signatures<>, exy::signatures_of<F>...>, exy::value_tag,
+            _::mp_append<exy::signatures<>, exy::signatures_of<F>...>, Tag,
             exy::signatures<_value_signature>>,
         std::is_nothrow_move_constructible_v<
             exy::signature_arguments_as<_value_signature, _::mp_quote<exy::pack>>>>;
@@ -31,12 +31,12 @@ struct _wall : exy::future_base
     }
 
     template <typename Cont>
-    using op = _when_op<_wall, Cont>;
+    using op = _when_op<_wall, Cont, F...>;
 
     template <typename S>
     static consteval bool _stop_on() noexcept
     {
-        return !exy::signature_with_tag<S, exy::value_tag>;
+        return !exy::signature_with_tag<S, Tag>;
     }
 
     template <typename Cont>
@@ -53,8 +53,7 @@ struct _wall : exy::future_base
         {
             auto& [... storage] = self._storage;
             auto [... args]     = std::tuple_cat([&] {
-                using signature
-                    = _::mp_only<_::mp_filter<exy::value_tag::is, exy::signatures_of<F>>>;
+                using signature = exy::unique_signature_with_tag<exy::signatures_of<F>, Tag>;
                 auto [... args] = exy::storage_ref(storage).get<signature>();
                 return std::make_tuple(exy_mov(args)...);
             }()...);
@@ -67,10 +66,11 @@ struct _wall : exy::future_base
     }
 };
 
-inline constexpr struct when_all_t
+template <typename Tag>
+struct when_all_t
 {
     template <exy::future F, typename S = exy::signatures_of<F>>
-        requires exy::has_unique_signature_with_tag<S, exy::value_tag>
+        requires exy::has_unique_signature_with_tag<S, Tag>
     static constexpr F&& operator()(F&& f)
     {
         return exy_mov(f);
@@ -78,12 +78,14 @@ inline constexpr struct when_all_t
 
     template <exy::future... F>
         requires (sizeof...(F) > 1)
-              && (exy::has_unique_signature_with_tag<exy::signatures_of<F>, exy::value_tag> && ...)
-    static constexpr _wall<F...> operator()(F&&... f)
+              && (exy::has_unique_signature_with_tag<exy::signatures_of<F>, Tag> && ...)
+    static constexpr _wall<Tag, F...> operator()(F&&... f)
     {
         return {{}, exy::make_pack(exy_mov(f)...)};
     }
-} when_all;
+};
+
+inline constexpr when_all_t<exy::value_tag> when_all;
 } // namespace exy::futures
 
 #endif // EXY_FUTURE_WHEN_ALL_HPP_INCLUDED

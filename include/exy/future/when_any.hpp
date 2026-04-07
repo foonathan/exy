@@ -28,7 +28,7 @@ struct _wany : exy::future_base
     }
 
     template <typename Cont>
-    using op = _when_op<_wany, Cont>;
+    using op = _when_op<_wany, Cont, F...>;
 
     template <typename S>
     static consteval bool _stop_on() noexcept

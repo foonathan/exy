@@ -12,10 +12,8 @@
 
 namespace exy::futures
 {
-template <typename Derived, typename Cont>
-struct _when_op;
-template <template <typename...> typename Derived, typename... F, typename Cont>
-struct _when_op<Derived<F...>, Cont>
+template <typename Derived, typename Cont, typename... F>
+struct _when_op
 {
     struct _s : exy::scheduler_base
     {
@@ -107,7 +105,7 @@ struct _when_op<Derived<F...>, Cont>
         {
             _when_op& self = Cont::get_op(ctx);
 
-            if constexpr (Derived<F...>::template _stop_on<S>())
+            if constexpr (Derived::template _stop_on<S>())
             {
                 exy::continuation expected = nullptr;
                 if (self._continuation.compare_exchange_strong(
@@ -125,14 +123,14 @@ struct _when_op<Derived<F...>, Cont>
                     }
                     catch (...)
                     {
-                        exy::set_exception<exy::signatures_of<Derived<F...>>, Cont>(result);
+                        exy::set_exception<exy::signatures_of<Derived>, Cont>(result);
                     }
                 }
             }
 
             auto prev_count = self._done.fetch_add(1, std::memory_order_acq_rel);
             if (prev_count + 1 == sizeof...(F))
-                return Derived<F...>::template _on_complete<Cont>(ctx);
+                return Derived::template _on_complete<Cont>(ctx);
             else
                 return self._yield(nullptr);
         }
