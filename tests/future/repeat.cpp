@@ -29,9 +29,7 @@ struct stop_env_t : test_env_t
 TEST_CASE("repeat in default environment", "[futures]")
 {
     auto failing = with_signature<exy::value_tag()>(exyf::error(0)) | exyf::repeat;
-    REQUIRE_SIGNATURES(
-        failing, exy::error_tag(int), exy::error_tag(std::exception_ptr), exy::stopped_tag()
-    );
+    REQUIRE_SIGNATURES(failing, exy::error_tag(int), exy::stopped_tag());
     CHECK_FUTURE(failing, exy::error_tag(), 0);
 }
 
@@ -45,14 +43,12 @@ TEST_CASE("repeat in stop_env", "[futures]")
                            test_env.stop_requested = true;
                    })
                  | exyf::repeat;
-    REQUIRE_SIGNATURES(nothrow, exy::error_tag(std::exception_ptr), exy::stopped_tag());
+    REQUIRE_SIGNATURES(nothrow, exy::stopped_tag());
     CHECK_FUTURE(nothrow, exy::stopped_tag());
 
     test_env.stop_requested = false;
     auto failing            = with_signature<exy::value_tag()>(exyf::error(0)) | exyf::repeat;
-    REQUIRE_SIGNATURES(
-        failing, exy::error_tag(int), exy::error_tag(std::exception_ptr), exy::stopped_tag()
-    );
+    REQUIRE_SIGNATURES(failing, exy::error_tag(int), exy::stopped_tag());
     CHECK_FUTURE(failing, exy::error_tag(), 0);
 }
 
