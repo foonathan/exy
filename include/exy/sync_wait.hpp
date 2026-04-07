@@ -4,9 +4,8 @@
 #ifndef EXY_SYNC_WAIT_HPP_INCLUDED
 #define EXY_SYNC_WAIT_HPP_INCLUDED
 
-#include <atomic>
 #include <optional>
-#include <tuple>
+#include <exy/scheduler/defer.hpp>
 #include <exy/support/future.hpp>
 #include <exy/support/query.hpp>
 
@@ -22,17 +21,11 @@ inline constexpr struct sync_wait_t
     template <typename F>
     struct _c
     {
-        std::exception_ptr _ex   = {};
-        std::atomic<bool>  _done = false;
+        exy::run_loop      _loop;
+        std::exception_ptr _ex = {};
         exy::storage<
             exy::max(F::storage_spec(), exy::storage_spec::get<std::optional<_value_type<F>>>())>
             _result;
-
-        void _complete() noexcept
-        {
-            _done.store(true, std::memory_order_release);
-            _done.notify_one();
-        }
 
         static constexpr _c&                _get_self(exy::ctx_base& ctx) noexcept;
         static constexpr F&                 get_future(exy::ctx_base& ctx) noexcept;
@@ -51,26 +44,26 @@ inline constexpr struct sync_wait_t
         template <exy::signature_with_tag<exy::value_tag> S>
         static constexpr void* call(exy::ctx_base& ctx)
         {
-            auto& self   = _get_self(ctx);
-            auto  result = get_result_storage(ctx);
+            _c&  self   = _get_self(ctx);
+            auto result = get_result_storage(ctx);
 
             auto [... args] = result.get<S>();
             result.emplace_raw<_value_type<F>>(std::in_place, exy_mov(args)...);
 
-            self._complete();
+            self._loop.finish();
             return nullptr;
         }
 
         template <exy::signature_with_tag<exy::error_tag> S>
         static constexpr void* call(exy::ctx_base& ctx)
         {
-            auto& self   = _get_self(ctx);
-            auto  result = get_result_storage(ctx);
+            _c&  self   = _get_self(ctx);
+            auto result = get_result_storage(ctx);
 
             auto [ex] = result.get<S>();
             self._ex  = ex;
 
-            self._complete();
+            self._loop.finish();
             return nullptr;
         }
 
@@ -83,7 +76,7 @@ inline constexpr struct sync_wait_t
             (void)result.get<S>();
             result.emplace_raw<_value_type<F>>(std::nullopt);
 
-            self._complete();
+            self._loop.finish();
             return nullptr;
         }
     };
@@ -105,7 +98,7 @@ inline constexpr struct sync_wait_t
     {
         _ctx<F> ctx(f);
         ctx._op.start(ctx);
-        ctx._done.wait(false, std::memory_order_acquire);
+        ctx._loop.run();
 
         if (ctx._ex)
             std::rethrow_exception(ctx._ex);
