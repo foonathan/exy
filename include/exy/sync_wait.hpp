@@ -14,8 +14,8 @@ namespace exy
 inline constexpr struct sync_wait_t
 {
     template <typename F>
-    using _value_type = std::optional<exy::signatures_fold_tag<
-        exy::signatures_of<F>, exy::value_tag, _::mp_quote<std::type_identity_t>,
+    using _value_type = std::optional<exy::signature_arguments_as<
+        exy::unique_signature_with_tag<exy::signatures_of<F>, exy::value_tag>,
         _::mp_quote<std::tuple>>>;
 
     template <typename F>
@@ -91,10 +91,10 @@ inline constexpr struct sync_wait_t
     };
 
     template <exy::future F, typename S = exy::signatures_of<F>>
-        requires exy::single_value_signatures<S> && exy::exception_error_signatures<S>
-    static constexpr auto operator()(F&& f) noexcept(
-        !_::mp_set_contains<S, exy::error_tag(std::exception_ptr)>::value
-    )
+        requires exy::has_unique_signature_with_tag<S, exy::value_tag>
+              && (!exy::signatures_any_of_tag<S, exy::error_tag>
+                  || exy::unique_signature_with_tag_is<S, exy::error_tag, std::exception_ptr>)
+    static constexpr auto operator()(F&& f) noexcept(exy::signatures_any_of_tag<S, exy::error_tag>)
     {
         _ctx<F> ctx(f);
         ctx._op.start(ctx);

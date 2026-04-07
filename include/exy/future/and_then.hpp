@@ -12,9 +12,9 @@
 namespace exy
 {
 template <typename Fn, typename S, typename Tag>
-concept invocable_with_signature_tag_yielding_future
-    = exy::invocable_with_signature_tag<Fn, S, Tag>
-   && _::mp_all_of<exy::invoke_results_of_signature_tag<Fn, S, Tag>, exy::is_future>::value;
+concept invocable_with_tagged_signatures_yielding_future
+    = exy::invocable_with_tagged_signatures<Fn, S, Tag>
+   && _::mp_all_of<exy::invoke_results_of_tagged_signatures<Fn, S, Tag>, exy::is_future>::value;
 } // namespace exy
 
 namespace exy::futures
@@ -26,7 +26,7 @@ struct _at : exy::future_base
     EXY_NO_UNIQUE_ADDRESS Fn   _fn;
 
     using _fn_result_types
-        = exy::invoke_results_of_signature_tag<Fn, exy::signatures_of<Base>, Tag>;
+        = exy::invoke_results_of_tagged_signatures<Fn, exy::signatures_of<Base>, Tag>;
 
     using signatures = exy::signatures_insert_exception<
         exy::signatures_replace_tag<
@@ -124,7 +124,7 @@ struct and_then_t
 {
     template <
         exy::future F, typename S = exy::signatures_of<F>,
-        exy::invocable_with_signature_tag_yielding_future<S, Tag> Fn>
+        exy::invocable_with_tagged_signatures_yielding_future<S, Tag> Fn>
     static constexpr auto operator()(F&& f, Fn&& fn) -> _at<F, Tag, std::decay_t<Fn>>
     {
         return {{}, exy_mov(f), exy_fwd(fn)};

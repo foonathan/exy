@@ -37,29 +37,14 @@ template <typename Tag, typename... T>
 using make_signature = _::mp_eval_if_c<
     std::same_as<_::mp_list<T...>, _::mp_list<void>>, Tag(), _make_signature, Tag, T...>;
 
-struct value_tag
+template <typename Derived>
+struct tag_base
 {
     template <typename... T>
-    using make = make_signature<value_tag, T...>;
+    using make = make_signature<Derived, T...>;
 
     template <typename T>
-    using is = std::bool_constant<signature_with_tag<T, value_tag>>;
-};
-struct error_tag
-{
-    template <typename... T>
-    using make = make_signature<error_tag, T...>;
-
-    template <typename T>
-    using is = std::bool_constant<signature_with_tag<T, error_tag>>;
-};
-struct stopped_tag
-{
-    template <typename... T>
-    using make = make_signature<stopped_tag, T...>;
-
-    template <typename T>
-    using is = std::bool_constant<signature_with_tag<T, stopped_tag>>;
+    using is = std::bool_constant<signature_with_tag<T, Derived>>;
 };
 
 struct any_tag
@@ -67,11 +52,19 @@ struct any_tag
     template <typename T>
     using is = _::mp_true;
 };
+
+struct value_tag : tag_base<value_tag>
+{};
+
+struct error_tag : tag_base<error_tag>
+{};
+
+struct stopped_tag : tag_base<stopped_tag>
+{};
 } // namespace exy
 
 namespace exy
 {
-
 template <typename... T>
 struct signatures
 {};
@@ -93,6 +86,10 @@ template <typename S, typename Tag, typename OtherS>
 using signatures_replace_tag
     = _::mp_unique<_::mp_append<_::mp_remove_if<S, Tag::template is>, OtherS>>;
 
+template <typename S, bool Noexcept>
+using signatures_insert_exception
+    = std::conditional_t<Noexcept, S, _::mp_set_push_back<S, exy::error_tag(std::exception_ptr)>>;
+
 template <typename S, typename Tag, typename QPredicate>
 constexpr bool signatures_all_of_tag = _::mp_all_of_q<
     _::mp_filter<Tag::template is, S>,
@@ -108,26 +105,20 @@ constexpr bool signatures_none_of_tag = _::mp_none_of_q<
     _::mp_filter<Tag::template is, S>,
     _::mp_bind_back<exy::signature_arguments_as, QPredicate>>::value;
 
-template <typename S, bool Noexcept>
-using signatures_insert_exception
-    = std::conditional_t<Noexcept, S, _::mp_set_push_back<S, exy::error_tag(std::exception_ptr)>>;
+template <typename S, typename Tag>
+using signatures_with_tag
+    = exy::signatures_fold_tag<S, Tag, _::mp_quote<signatures>, _::mp_quote<Tag::template make>>;
 
-template <typename S>
-concept void_value_signature
-    = std::same_as<_::mp_filter<exy::value_tag::is, S>, exy::signatures<exy::value_tag()>>;
+template <typename S, typename Tag>
+using unique_signature_with_tag = _::mp_only<signatures_with_tag<S, Tag>>;
 
-template <typename S>
-concept single_value_signatures
-    = _::mp_size<exy::signatures_fold_tag<
-          S, exy::value_tag, _::mp_quote<_::mp_list>, _::mp_quote<std::tuple>>>::value
-   == 1;
+template <typename S, typename Tag>
+concept has_unique_signature_with_tag = requires { typename unique_signature_with_tag<S, Tag>; };
 
-template <typename S>
-concept exception_error_signatures = exy::signatures_all_of_tag<
-    S, exy::error_tag,
-    _::mp_compose<
-        _::mp_list, _::mp_bind_back<std::is_same, _::mp_list<std::exception_ptr>>::template fn>>;
-
+template <typename S, typename Tag, typename T>
+concept unique_signature_with_tag_is
+    = has_unique_signature_with_tag<S, Tag>
+   && std::same_as<unique_signature_with_tag<S, Tag>, typename Tag::template make<T>>;
 } // namespace exy
 
 #endif // EXY_SUPPORT_SIGNATURE_HPP_INCLUDED

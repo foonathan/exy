@@ -120,7 +120,8 @@ struct _r : exy::future_base
 inline constexpr struct eager_repeat_t : exy::adapter
 {
     template <exy::future F, typename S = exy::signatures_of<F>>
-        requires std::is_copy_constructible_v<F> && exy::void_value_signature<S>
+        requires std::is_copy_constructible_v<F>
+              && exy::unique_signature_with_tag_is<S, exy::value_tag, void>
     static constexpr _r<F> operator()(F&& f)
     {
         return {{}, exy_mov(f)};
@@ -130,7 +131,8 @@ inline constexpr struct eager_repeat_t : exy::adapter
 inline constexpr struct repeat_t : exy::adapter
 {
     template <exy::future F, typename S = exy::signatures_of<F>>
-        requires std::is_copy_constructible_v<F> && exy::void_value_signature<S>
+        requires std::is_copy_constructible_v<F>
+              && exy::unique_signature_with_tag_is<S, exy::value_tag, void>
     static constexpr auto operator()(F&& f)
     {
         return exy::futures::eager_repeat(exy::futures::yield(exy_mov(f)));

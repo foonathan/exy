@@ -2,6 +2,7 @@ Checks: >
     -*,
     bugprone-*,
     -bugprone-easily-swappable-parameters,
+    -bugprone-crtp-constructor-accessibility,
     clang-analyzer-*,
     misc-*,
     -misc-non-private-member-variables-in-classes,

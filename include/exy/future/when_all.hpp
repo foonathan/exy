@@ -14,9 +14,8 @@ struct _wall : exy::future_base
     EXY_NO_UNIQUE_ADDRESS exy::pack<F...> _base;
 
     using _value_signature = _::mp_apply<
-        exy::value_tag::make, _::mp_append<exy::signatures_fold_tag<
-                                  exy::signatures_of<F>, exy::value_tag,
-                                  _::mp_quote<std::type_identity_t>, _::mp_quote<_::mp_list>>...>>;
+        exy::value_tag::make, _::mp_append<exy::signature_arguments<exy::unique_signature_with_tag<
+                                  exy::signatures_of<F>, exy::value_tag>>...>>;
 
     using signatures = exy::signatures_insert_exception<
         exy::signatures_replace_tag<
@@ -71,14 +70,15 @@ struct _wall : exy::future_base
 inline constexpr struct when_all_t
 {
     template <exy::future F, typename S = exy::signatures_of<F>>
-        requires exy::single_value_signatures<S>
+        requires exy::has_unique_signature_with_tag<S, exy::value_tag>
     static constexpr F&& operator()(F&& f)
     {
         return exy_mov(f);
     }
 
     template <exy::future... F>
-        requires (sizeof...(F) > 1) && (exy::single_value_signatures<exy::signatures_of<F>> && ...)
+        requires (sizeof...(F) > 1)
+              && (exy::has_unique_signature_with_tag<exy::signatures_of<F>, exy::value_tag> && ...)
     static constexpr _wall<F...> operator()(F&&... f)
     {
         return {{}, exy::make_pack(exy_mov(f)...)};

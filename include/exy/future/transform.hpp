@@ -10,11 +10,11 @@
 namespace exy
 {
 template <typename Fn, typename S, typename Tag>
-using invoke_results_of_signature_tag = _::mp_unique<exy::signatures_fold_tag<
+using invoke_results_of_tagged_signatures = _::mp_unique<exy::signatures_fold_tag<
     S, Tag, _::mp_quote<_::mp_list>, _::mp_bind_front<exy::invoke_result_t, Fn>>>;
 
 template <typename Fn, typename S, typename Tag>
-concept invocable_with_signature_tag
+concept invocable_with_tagged_signatures
     = exy::signatures_all_of_tag<S, Tag, _::mp_bind_front<exy::is_invocable, Fn>>;
 } // namespace exy
 
@@ -102,8 +102,8 @@ template <typename TagFrom, typename TagTo>
 struct transform_t
 {
     template <
-        exy::future                                   F, typename S = exy::signatures_of<F>,
-        exy::invocable_with_signature_tag<S, TagFrom> Fn>
+        exy::future                                       F, typename S = exy::signatures_of<F>,
+        exy::invocable_with_tagged_signatures<S, TagFrom> Fn>
     static constexpr auto operator()(F&& f, Fn&& fn) -> _t<F, TagFrom, std::decay_t<Fn>, TagTo>
     {
         return {{}, exy_mov(f), exy_fwd(fn)};

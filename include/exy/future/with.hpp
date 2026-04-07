@@ -73,8 +73,8 @@ template <typename Tag>
 struct with_t
 {
     template <
-        exy::future                               F, typename S = exy::signatures_of<F>,
-        exy::invocable_with_signature_tag<S, Tag> Fn>
+        exy::future                                   F, typename S = exy::signatures_of<F>,
+        exy::invocable_with_tagged_signatures<S, Tag> Fn>
     static constexpr auto operator()(F&& f, Fn&& fn) -> _w<F, Tag, std::decay_t<Fn>>
     {
         return {{}, exy_mov(f), exy_fwd(fn)};
