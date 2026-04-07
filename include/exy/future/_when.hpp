@@ -7,6 +7,7 @@
 #include <atomic>
 #include <exy/query/scheduler.hpp>
 #include <exy/query/stop.hpp>
+#include <exy/query/work.hpp>
 #include <exy/support/adapter.hpp>
 
 namespace exy::futures
@@ -89,6 +90,12 @@ struct _when_op<Derived<F...>, Cont>
             return {{}, &self};
         }
 
+        static constexpr exy::continuation query(exy::queries::inline_work_t, exy::ctx_base& ctx)
+        {
+            _when_op& self = Cont::get_op(ctx);
+            return self._yield(nullptr);
+        }
+
         static constexpr auto query(exy::query auto q, exy::ctx_base& ctx)
             -> decltype(Cont::query(q, ctx))
         {
@@ -148,7 +155,7 @@ struct _when_op<Derived<F...>, Cont>
 
     exy::continuation _yield(exy::continuation next)
     {
-        while (true)
+        for (auto i = 0; i != sizeof...(F); ++i)
         {
             auto idx = _scheduler_idx.fetch_add(1, std::memory_order_acq_rel) % (sizeof...(F) - 1);
             auto expected = _scheduler_queue[idx].load(std::memory_order_relaxed);
@@ -158,6 +165,7 @@ struct _when_op<Derived<F...>, Cont>
                 ))
                 return expected;
         }
+        return nullptr;
     }
 
     static constexpr void* start(exy::ctx_base& ctx)

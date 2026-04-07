@@ -4,6 +4,7 @@
 #ifndef EXY_SCHEDULER_PARALLEL_HPP_INCLUDED
 #define EXY_SCHEDULER_PARALLEL_HPP_INCLUDED
 
+#include <exy/query/work.hpp>
 #include <exy/support/future.hpp>
 #include <exy/support/scheduler.hpp>
 
@@ -64,7 +65,7 @@ class parallel : public exy::scheduler_base
                             .continuation = exy::set<signatures, Cont, exy::value_tag()>(result),
                         };
                         f._backend->schedule(self._job, ctx);
-                        return nullptr;
+                        return exy::query_or_default<Cont>(exy::queries::inline_work, ctx);
                     }
                     catch (...)
                     {

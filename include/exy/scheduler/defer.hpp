@@ -6,6 +6,7 @@
 
 #include <mutex>
 #include <condition_variable>
+#include <exy/query/work.hpp>
 #include <exy/support/future.hpp>
 #include <exy/support/scheduler.hpp>
 
@@ -141,7 +142,11 @@ class defer : public exy::scheduler_base
                     .s            = &ctx,
                 };
                 f._loop->push(&self._job);
-                return nullptr;
+
+                if (auto cont = exy::query_or_default<Cont>(exy::queries::inline_work, ctx))
+                    EXY_TAIL_CALL cont(ctx);
+                else
+                    return nullptr;
             }
         };
     };
